@@ -6,6 +6,20 @@ from sendStringScript import sendString
 leftMotor=int(100)
 rightMotor=int(100)
 
+intersection_counter = 0;
+at_intersection = False;
+rotationStateRight = False
+followingState = False;
+rotationStateLeft = False;
+pattern = ["forward", "forward", "turn-right", "forward", "turn-left"]
+# Idea of Implementation
+# We have certain states that are running that set the motor power (such as forward moves both mtoros forward)
+# turn right turns right
+# when we are off on the line following (too right or too left) - we apply correction on top of the states to go back onto the line
+# the correction should only apply at straight line following
+# when it detects the intersection it switches to the next state in the pattern
+   # in this part we need to implement a system when it doesn't constantly switch state when at intersection 
+
 
 if __name__ == '__main__':
     ser=serial.Serial('/dev/ttyACM0',115200)
@@ -18,6 +32,7 @@ if __name__ == '__main__':
                  
                 line = ser.readline().decode('utf-8')
                 line=line.split(',')
+                print(line)
                 #this splits the incoming string up by commas
                 try:
                     
@@ -37,12 +52,12 @@ if __name__ == '__main__':
                 #below is a basic control law you can send to your motors, with an exeption if z is a value greater than 7000, meaning the arduino code sees that the line sensor is on a cross. Feel free to take insperation from this,
             #but you will need to impliment a state machine similar to what you made in lab 2 (including a way of counting time without blocking)
             
-                if not z < 7000: #im assuming that in your arduino code you will be setting z to the int 8000 if you sense a cross, dont feel obligated to do it this way.  
+                if int(y) == 0: #im assuming that in your arduino code you will be setting z to the int 8000 if you sense a cross, dont feel obligated to do it this way.  
                     leftMotor=100+.02*z #now that we are SURE that z isnt the string cross, we cast z to an int and recalculate leftMotor and rightMotor, 
                     rightMotor=250-.02*z
                     print('not at intersection')
                 else:
-                    print('at intersetion')
+                    print('at intersection')
                     #do something here like incrimenting a value you call 'lines_hit' to one higher, and writing code to make sure that some time (1 second should do it) 
                     # passes between being able to incriment lines_hit so that it wont be incrimented a bunch of times when you hit your first cross. IE give your robot time to leave a cross
                     #before allowing lines_hit to be incrimented again.
