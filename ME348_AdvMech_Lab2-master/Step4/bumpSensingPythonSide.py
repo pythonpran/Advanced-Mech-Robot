@@ -14,6 +14,8 @@ a=int(1)
 b=int(1)
 c=int(1)
 
+running = True
+
 def assignString(states):
     states = list(map(str,states))
     statesString = "".join(states);
@@ -26,6 +28,8 @@ def assignString(states):
             return "AVOID_RIGHT_OBSTABLE"
         case "111111":
             return "KEEP_MOVING_FORWARD"
+        case "010101":
+            return "STOP_PROGRAM"
         case _:
             return "INDETERMINATE"
 
@@ -36,7 +40,7 @@ if __name__ == '__main__':
     ready = 0
     
 
-    while True:
+    while running:
         
         #think of the below line as the default condition where no pairs of sensors are triggered as state 0, where the robot moves forward
         sendString('/dev/ttyACM0',115200,'<'+str(leftMotor)+','+str(rightMotor)+'>',0.0005)
@@ -84,6 +88,9 @@ if __name__ == '__main__':
                     leftMotor, rightMotor = (-50, -50);
                 case "KEEP_MOVING_FORWARD":
                     leftMotor, rightMotor = (50, 50);
+                case "STOP_PROGRAM":
+                    leftMotor, rightMotor = (0, 0);
+                    running = False         
                     
         
         if x < 1 and y < 1:
