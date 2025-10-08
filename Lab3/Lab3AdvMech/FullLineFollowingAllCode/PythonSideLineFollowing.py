@@ -30,7 +30,7 @@ def count():
     if y==1 and yprev!=1:
         counter +=1
         yprev=y
-        #print(counter)
+        #print(counter) 
     else :
         yprev=y
 
@@ -38,6 +38,8 @@ def count():
 
 def assignString(x,y,intersection_counter):
     if y==0 and x>=1000:
+        state="following"
+    elif y==1 and intersection_counter==1:
         state="following"
     elif y==1 and intersection_counter==2:
         state="turn_right"
@@ -89,14 +91,14 @@ if __name__ == '__main__':
                         leftMotor=0.4*(250-.02*x)
                     case "turn_right":
                         print("inside turn right state")
-                        leftMotor=150  
+                        leftMotor=125  
                         rightMotor=0
-                        time.sleep(1)
+                        time.sleep(.9)
                     case "turn_left":
                         print("inside turn left state")
                         leftMotor=0  
-                        rightMotor=150
-                        time.sleep(1)
+                        rightMotor=140
+                        time.sleep(.7)
                     case "INDETERMINATE":
                         print("inside indeterminate state")
                         leftMotor, rightMotor = (0, 0);
