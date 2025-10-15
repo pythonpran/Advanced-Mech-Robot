@@ -9,6 +9,8 @@ AStar32U4Motors m; //read the documentation of this library to understand what f
 int leftMotor; // COMMANDED MOTOR SPEEDS
 int rightMotor;
 
+int ctr;
+
 double leftMotorMax = 26.45; // **students should find this variable themselves**
 double rightMotorMax = 28.86;
 
@@ -54,8 +56,8 @@ double kiL = 0.025;
 double kdL = 0.02;
 // Right MOTOR - assumes we need to tune them differently
 double kpR = 2.25;
-double kiR = 0.0;
-double kdR = 0.0;                                                                                                                                                                                              ;
+double kiR = 0.5;
+double kdR = 0.04;                                                                                                                                                                                              ;
 
 //=====================================================
 
@@ -100,10 +102,15 @@ void loop() {
 //      Serial.print("  ===  LEFT: ");
 //      Serial.print(velLeft);
 //      Serial.print(',');
-//      Serial.println(newVelLeft);
+//      Serial.println(newVelLeft)
+        ctr = 0;
+        ctr = ctr+1;
+   if (ctr < 1000){
         Serial.print(velLeft);
         Serial.print(',');
         Serial.println(velRight);
+   }
+        
 
       rightMotor = motorVelToSpeedCommand(newVelRight,rightMotorMax);
       leftMotor = motorVelToSpeedCommand(newVelLeft,leftMotorMax);
