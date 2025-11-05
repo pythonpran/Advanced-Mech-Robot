@@ -15,7 +15,7 @@ bool lastButtonState = HIGH;
 
 // ---- DC motor pins ----
 const int MOTOR_IN1 = 4;
-const int MOTOR_IN2 = 5;
+const int MOTOR_IN2 = 6;
 const int MOTOR_EN = 11;
 const int MOTOR_DELAY_Forward = 1000;  
 const int MOTOR_DELAY_Back = 1000; 
