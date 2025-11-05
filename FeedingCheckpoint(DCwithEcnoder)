@@ -1,0 +1,92 @@
+#include <AStar32U4Motors.h>
+#include <Encoder.h>
+#include <Servo.h>
+
+AStar32U4Motors m;
+
+const int encoderRightPinA = 16;
+const int encoderRightPinB = 15;
+Encoder encoderRight(encoderRightPinA, encoderRightPinB);
+
+const int MOTOR_IN1 = 4;
+const int MOTOR_IN2 = 6;
+const int MOTOR_EN = 5; 
+
+const int MOTOR_SPEED = 200; 
+const double degreesPerCount = 360.0 / 48;
+const double TARGET_DEGREES = 60.0;  
+long targetCounts = TARGET_DEGREES / degreesPerCount;
+
+const int BUTTON_PIN = 17;
+bool lastButtonState = HIGH;
+
+Servo myServo;
+const int SERVO_PIN = 11;
+int servoPulse = 500;
+const int STEP_SIZE = 333;
+const int MIN_PULSE = 500;
+const int MAX_PULSE = 2498;
+int currentPulse = MIN_PULSE;
+int step = STEP_SIZE;
+
+void setup() {
+  Serial.begin(9600);
+
+  myServo.attach(SERVO_PIN);
+  myServo.writeMicroseconds(servoPulse);
+
+  pinMode(BUTTON_PIN, INPUT);
+
+  pinMode(MOTOR_IN1, OUTPUT);
+  pinMode(MOTOR_IN2, OUTPUT);
+  pinMode(MOTOR_EN, OUTPUT);
+  analogWrite(MOTOR_EN, 0);
+  
+  delay(10000);
+}
+
+void loop() {
+  bool buttonState = digitalRead(BUTTON_PIN);
+
+  if (lastButtonState == HIGH && buttonState == LOW) {
+    currentPulse += step;
+
+    if (currentPulse >= MAX_PULSE) {
+      currentPulse = MAX_PULSE;
+      step = -STEP_SIZE;
+    } 
+    else if (currentPulse <= MIN_PULSE) {
+      currentPulse = MIN_PULSE;
+      step = STEP_SIZE;
+    }
+
+    myServo.writeMicroseconds(currentPulse);
+
+    long startCount = encoderRight.read();
+
+    digitalWrite(MOTOR_IN1, HIGH);
+    digitalWrite(MOTOR_IN2, LOW);
+    analogWrite(MOTOR_EN, MOTOR_SPEED);
+
+    while (abs(encoderRight.read() - startCount) < targetCounts) {
+      delay(1);
+    }
+
+    long startCount = encoderRight.read();
+
+    digitalWrite(MOTOR_IN1, LOW);
+    digitalWrite(MOTOR_IN2, HIGH);
+    analogWrite(MOTOR_EN, MOTOR_SPEED);
+
+    while (abs(encoderRight.read() - startCount) < targetCounts) {
+      delay(1);
+    }
+    digitalWrite(MOTOR_IN1, LOW);
+    digitalWrite(MOTOR_IN2, LOW);
+    analogWrite(MOTOR_EN, 0);
+
+    delay(50);
+  }
+
+  lastButtonState = buttonState;
+}
