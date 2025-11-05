@@ -2,21 +2,19 @@
 
 Servo myServo;
 
-// ---- Servo parameters ----
-const int SERVO_PIN = 5;
-const int BUTTON_PIN = 17;     // USER button on A-Star
+const int SERVO_PIN = 11;
+const int BUTTON_PIN = 17;    
 const int STEP_SIZE = 333;
 const int MIN_PULSE = 500;
-const int MAX_PULSE = 2498;    // Adjusted to prevent overshoot
+const int MAX_PULSE = 2498;  
 
 int currentPulse = MIN_PULSE;
 int step = STEP_SIZE;
 bool lastButtonState = HIGH;
 
-// ---- DC motor pins ----
 const int MOTOR_IN1 = 4;
 const int MOTOR_IN2 = 6;
-const int MOTOR_EN = 11;
+const int MOTOR_EN = 5;
 const int MOTOR_DELAY_Forward = 1000;  
 const int MOTOR_DELAY_Back = 1000; 
 const int MOTOR_SPEED = 200; 
@@ -69,7 +67,6 @@ void loop() {
     digitalWrite(MOTOR_IN2, LOW);
     analogWrite(MOTOR_EN, 0);
 
-    // Debounce
     delay(50);
   }
 
