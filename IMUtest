@@ -1,0 +1,14 @@
+from time import sleep
+from sparkfun_icm20948 import ICM20948
+
+imu = ICM20948()
+
+while True:
+    magX, magY, magZ = imu.magnetometer
+
+    print(f"Magnetometer X: {magX:.2f} µT")
+    print(f"Magnetometer Y: {magY:.2f} µT")
+    print(f"Magnetometer Z: {magZ:.2f} µT")
+    print("-----------------------------")
+
+    sleep(0.5)
