@@ -5,8 +5,8 @@ Servo myServo;
 const int SERVO_PIN = 11;
 const int BUTTON_PIN = 17;    
 const int STEP_SIZE = 333;
-const int MIN_PULSE = 500;
-const int MAX_PULSE = 2498;  
+const int MIN_PULSE = 620;
+const int MAX_PULSE = 2285;  
 
 int currentPulse = MIN_PULSE;
 int step = STEP_SIZE;
@@ -15,7 +15,7 @@ bool lastButtonState = HIGH;
 const int MOTOR_IN1 = 4;
 const int MOTOR_IN2 = 6;
 const int MOTOR_EN = 5;
-const int MOTOR_DELAY_Forward = 1000;  
+const int MOTOR_DELAY_Forward = 500;  
 const int MOTOR_DELAY_Back = 1000; 
 const int MOTOR_SPEED = 200; 
 
@@ -31,7 +31,7 @@ void setup() {
   digitalWrite(MOTOR_IN1, LOW);
   digitalWrite(MOTOR_IN2, LOW);
   analogWrite(MOTOR_EN, 0); 
-
+  //myServo.writeMicroseconds(currentPulse);
   delay(10000);
 }
 
@@ -50,18 +50,20 @@ void loop() {
       currentPulse = MIN_PULSE;
       step = STEP_SIZE;
     }
-
+  Serial.println(currentPulse);
     myServo.writeMicroseconds(currentPulse);
+
+    delay(1000);
 
     digitalWrite(MOTOR_IN1, HIGH);
     digitalWrite(MOTOR_IN2, LOW);
     analogWrite(MOTOR_EN, MOTOR_SPEED);
     delay(MOTOR_DELAY_Forward);
 
-    digitalWrite(MOTOR_IN1, LOW);
-    digitalWrite(MOTOR_IN2, HIGH);
-    analogWrite(MOTOR_EN, MOTOR_SPEED);
-    delay(MOTOR_DELAY_Back);
+    //digitalWrite(MOTOR_IN1, LOW);
+    //digitalWrite(MOTOR_IN2, HIGH);
+    //analogWrite(MOTOR_EN, MOTOR_SPEED);
+    //delay(MOTOR_DELAY_Back);
 
     digitalWrite(MOTOR_IN1, LOW);
     digitalWrite(MOTOR_IN2, LOW);
