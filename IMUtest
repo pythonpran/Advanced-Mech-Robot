@@ -1,14 +1,38 @@
-from time import sleep
-from sparkfun_icm20948 import ICM20948
+#!/usr/bin/env python3
 
-imu = ICM20948()
+import time
+import math
+
+try:
+    import qwiic_icm20948
+except ImportError:
+    print("Module qwiic_icm20948 not found. Make sure you installed sparkfun-qwiic-icm20948 in this environment.")
+    exit()
+
+# Initialize IMU
+IMU = qwiic_icm20948.QwiicIcm20948()
+
+if not IMU.connected:
+    print("ICM-20948 not detected. Check wiring and I2C interface.")
+    exit()
+
+IMU.begin()
+time.sleep(1)
+
+print("Reading magnetometer values... (Ctrl+C to stop)")
 
 while True:
-    magX, magY, magZ = imu.magnetometer
+    if IMU.dataReady():
+        IMU.getAgmt()  # update accelerometer, gyro, mag, temp
+        magx = IMU.mx
+        magy = IMU.my
+        magz = IMU.mz
 
-    print(f"Magnetometer X: {magX:.2f} µT")
-    print(f"Magnetometer Y: {magY:.2f} µT")
-    print(f"Magnetometer Z: {magZ:.2f} µT")
-    print("-----------------------------")
+        # Simple 2D compass heading
+        heading = math.degrees(math.atan2(magy, magx))
+        if heading < 0:
+            heading += 360
 
-    sleep(0.5)
+        print(f"MagX: {magx:.2f} µT, MagY: {magy:.2f} µT, MagZ: {magz:.2f} µT, Heading: {heading:.1f}°")
+
+    time.sleep(0.2)
