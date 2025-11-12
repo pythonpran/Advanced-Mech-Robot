@@ -1,0 +1,151 @@
+/****************************************************************
+ * ICM-20948 Magnetometer Calibration Example
+ * Based on SparkFun Example1_Basics.ino
+ * 
+ * Rotate the sensor slowly in all directions for 30–60 seconds.
+ * The sketch records min/max magnetometer readings and prints
+ * calculated offsets (bias values) you can use later.
+ ***************************************************************/
+
+#include "ICM_20948.h"
+
+// Uncomment to use SPI instead of I2C
+// #define USE_SPI       
+
+#define SERIAL_PORT Serial
+#define SPI_PORT SPI
+#define CS_PIN 2
+#define WIRE_PORT Wire
+#define AD0_VAL 1
+
+#ifdef USE_SPI
+ICM_20948_SPI myICM;
+#else
+ICM_20948_I2C myICM;
+#endif
+
+// Calibration storage
+float magMin[3] = { 9999, 9999, 9999 };
+float magMax[3] = {-9999,-9999,-9999 };
+
+void setup()
+{
+  SERIAL_PORT.begin(115200);
+  while (!SERIAL_PORT) {}
+
+#ifdef USE_SPI
+  SPI_PORT.begin();
+#else
+  WIRE_PORT.begin();
+  WIRE_PORT.setClock(400000);
+#endif
+
+  SERIAL_PORT.println("ICM-20948 Magnetometer Calibration");
+  SERIAL_PORT.println("Rotate the sensor in all directions...");
+
+  bool initialized = false;
+  while (!initialized)
+  {
+#ifdef USE_SPI
+    myICM.begin(CS_PIN, SPI_PORT);
+#else
+    myICM.begin(WIRE_PORT, AD0_VAL);
+#endif
+
+    SERIAL_PORT.print(F("Initialization status: "));
+    SERIAL_PORT.println(myICM.statusString());
+    if (myICM.status != ICM_20948_Stat_Ok)
+    {
+      SERIAL_PORT.println("Retrying...");
+      delay(500);
+    }
+    else
+    {
+      initialized = true;
+    }
+  }
+
+  SERIAL_PORT.println("ICM initialized. Begin calibration!");
+}
+
+void loop()
+{
+  if (myICM.dataReady())
+  {
+    myICM.getAGMT();  // update all data
+    float mx = myICM.magX();
+    float my = myICM.magY();
+    float mz = myICM.magZ();
+
+    // Update min/max
+    if (mx < magMin[0]) magMin[0] = mx;
+    if (my < magMin[1]) magMin[1] = my;
+    if (mz < magMin[2]) magMin[2] = mz;
+    if (mx > magMax[0]) magMax[0] = mx;
+    if (my > magMax[1]) magMax[1] = my;
+    if (mz > magMax[2]) magMax[2] = mz;
+
+    // Compute offsets (bias)
+    float offsetX = (magMax[0] + magMin[0]) / 2.0;
+    float offsetY = (magMax[1] + magMin[1]) / 2.0;
+    float offsetZ = (magMax[2] + magMin[2]) / 2.0;
+
+    SERIAL_PORT.print("Mag(uT): [ ");
+    printFormattedFloat(mx, 6, 2);
+    SERIAL_PORT.print(", ");
+    printFormattedFloat(my, 6, 2);
+    SERIAL_PORT.print(", ");
+    printFormattedFloat(mz, 6, 2);
+    SERIAL_PORT.println(" ]");
+
+    SERIAL_PORT.print("Min: [ ");
+    printFormattedFloat(magMin[0], 6, 2);
+    SERIAL_PORT.print(", ");
+    printFormattedFloat(magMin[1], 6, 2);
+    SERIAL_PORT.print(", ");
+    printFormattedFloat(magMin[2], 6, 2);
+    SERIAL_PORT.print(" ]  Max: [ ");
+    printFormattedFloat(magMax[0], 6, 2);
+    SERIAL_PORT.print(", ");
+    printFormattedFloat(magMax[1], 6, 2);
+    SERIAL_PORT.print(", ");
+    printFormattedFloat(magMax[2], 6, 2);
+    SERIAL_PORT.println(" ]");
+
+    SERIAL_PORT.print("Offsets (bias): [ ");
+    printFormattedFloat(offsetX, 6, 2);
+    SERIAL_PORT.print(", ");
+    printFormattedFloat(offsetY, 6, 2);
+    SERIAL_PORT.print(", ");
+    printFormattedFloat(offsetZ, 6, 2);
+    SERIAL_PORT.println(" ]");
+    SERIAL_PORT.println("------------------------------------------------");
+
+    delay(200);
+  }
+  else
+  {
+    SERIAL_PORT.println("Waiting for data...");
+    delay(500);
+  }
+}
+
+// Reuse SparkFun’s formatting function
+void printFormattedFloat(float val, uint8_t leading, uint8_t decimals)
+{
+  float aval = abs(val);
+  if (val < 0) SERIAL_PORT.print("-");
+  else SERIAL_PORT.print(" ");
+  
+  for (uint8_t indi = 0; indi < leading; indi++)
+  {
+    uint32_t tenpow = 0;
+    if (indi < (leading - 1)) tenpow = 1;
+    for (uint8_t c = 0; c < (leading - 1 - indi); c++) tenpow *= 10;
+    if (aval < tenpow) SERIAL_PORT.print("0");
+    else break;
+  }
+
+  if (val < 0) SERIAL_PORT.print(-val, decimals);
+  else SERIAL_PORT.print(val, decimals);
+}
