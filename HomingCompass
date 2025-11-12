@@ -1,0 +1,122 @@
+#!/usr/bin/env python
+
+import RPi.GPIO as GPIO
+import time
+import serial
+import numpy as np
+import qwiic_icm20948
+import sys
+import math
+from sendStringScript import sendString
+
+target=int(90)
+state = "idle"
+x=int(0)
+leftMotor=int(100)
+rightMotor=int(-100)
+def calibrateCompass():
+    print("\nSparkFun 9DoF ICM-20948 Sensor Magnetometer Calibration\n")
+    IMU = qwiic_icm20948.QwiicIcm20948()
+
+    if IMU.connected == False:
+        print("The Qwiic ICM20948 device isn't connected to the system. Please check your connection", file=sys.stderr)
+        return
+
+    IMU.begin()
+    time.sleep(1)
+
+    # --- Calibration phase ---
+    print("Rotate the sensor slowly in all directions for 15 seconds to calibrate magnetometer...")
+    mag_x_min = mag_y_min = mag_z_min = float('inf')
+    mag_x_max = mag_y_max = mag_z_max = float('-inf')
+
+    start_time = time.time()
+    while time.time() - start_time < 15:
+        if IMU.dataReady():
+            IMU.getAgmt()  # update all axes
+
+            # Update min/max for calibration
+            mag_x_min = min(mag_x_min, IMU.mxRaw)
+            mag_y_min = min(mag_y_min, IMU.myRaw)
+            mag_z_min = min(mag_z_min, IMU.mzRaw)
+
+            mag_x_max = max(mag_x_max, IMU.mxRaw)
+            mag_y_max = max(mag_y_max, IMU.myRaw)
+            mag_z_max = max(mag_z_max, IMU.mzRaw)
+        time.sleep(0.05)
+
+    # Compute offsets
+    offset_x = (mag_x_max + mag_x_min) / 2
+    offset_y = (mag_y_max + mag_y_min) / 2
+    offset_z = (mag_z_max + mag_z_min) / 2
+
+    print("\nCalibration complete.")
+    print(f"Offsets -> X: {offset_x:.2f}, Y: {offset_y:.2f}, Z: {offset_z:.2f}\n")
+
+    # --- Main loop ---
+if __name__ == '__main__':
+    ser=serial.Serial('/dev/ttyACM0',9600)
+    #ser=serial.Serial('/dev/ttyS0',9600)
+    ser.reset_input_buffer() #clears anything the arduino has been sending while the Rpi isnt prepared to recieve.
+
+    while True:
+        sendString('/dev/ttyACM0',9600,'<'+str(leftMotor)+','+str(rightMotor)+'>',0.0001)
+        #sendString('/dev/ttyS0',9600,'<'+str(leftMotor)+','+str(rightMotor)+'>',0.0001)
+        
+        if ser.in_waiting > 0:  #we wait until the arduino has sent something to us before we try to read anything from the serial port.
+                 
+                line = ser.readline().decode('utf-8')
+                line=line.split(',')
+                print(line)
+                #this splits the incoming string up by commas
+                try:                  
+                    x=int(line[0])
+                    print(x)
+                except:
+                    print("packet dropped") #this is designed to catch when python shoves bits on top of each other. 
+        match state:
+            case "idle":
+                if x==2:
+                    print("idle") 
+                    state = "calibrating"
+            case "calibrating":
+                calibrateCompass()
+            case "Aligning":
+                print("Starting Align")    
+                if IMU.dataReady():
+                    IMU.getAgmt()
+
+                    # Apply offsets
+                    mag_x = IMU.mxRaw - offset_x
+                    mag_y = IMU.myRaw - offset_y
+                    mag_z = IMU.mzRaw - offset_z
+
+                    # Compute heading (2D compass)
+                    heading = math.degrees(math.atan2(mag_y, mag_x))
+                    if heading < 0:
+                        heading += 360
+
+                    print(
+                        f"mx: {mag_x:6.0f}\tmy: {mag_y:6.0f}\tmz: {mag_z:6.0f}\tHeading: {heading:.1f}°"
+                    )
+                else:
+                    print("Waiting for data...")
+
+                if heading > target:
+                    print("Counterclockwise")
+                    leftMotor = -100
+                    rightMotor = 100
+                    time.sleep(2)
+                elif heading < target:
+                    print("Clockwise")
+                    leftMotor = 100
+                    rightMotor = -100
+                    time.sleep(2)
+                elif abs(heading - target)<tol:
+                    leftMotor = 0
+                    rightMotor = 0
+                    state = "done"
+
+            case "done":
+                print("Finished Aligning")
+                leftMotor, rightMotor = (0, 0);
