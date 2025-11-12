@@ -1,0 +1,134 @@
+#include <AStar32U4Motors.h>
+AStar32U4Motors m; //read the documentation of this library to understand what functions to use to drive the motors and how to use them
+
+const byte numChars = 32;
+char receivedChars[numChars];
+char tempChar[numChars]; // temporary array used for parsing
+
+
+//motor command variables
+int leftMotor=0; //int leftMotor
+int rightMotor=0;
+
+  
+boolean newData = false;
+int calibBool = 0;
+
+const int BUTTON_PIN = 17; 
+bool lastButtonState = HIGH;
+
+//=====================================================
+
+void setup() {
+   pinMode(3, OUTPUT); //left motor
+   pinMode(2,OUTPUT); //Right motor 
+   pinMode(BUTTON_PIN, INPUT_PULLUP);  
+   Serial.begin(9600);
+   Serial.println("<Arduino is ready>");
+}
+
+//====================================================
+
+void loop() {
+
+
+    recvWithStartEndMarkers(); //this function is in charge of taking a peice of data that looks like <17,16> 
+                               //turning it into a string looking like 17,16 and then setting newdata to true,
+                               //letting the rest of the program know a packet of data is ready to be analyzed, does all this without blocking
+    if (newData == true) { //newData will be true when recvWithStartEndMarkers(); has finished recieving a whole set of data from Rpi (a set of data is denoted as being containted between <>)
+      
+      strcpy(tempChar, receivedChars); //this line makes a copy of recievedChars for parsing in parseData, I do this becasue strtok() will alter any string I give it,I want to preserve the origonal data
+      parseData(); //right now parseData only parses a string of 2 numbers seperated by commas into floats
+                   //so the string 17.5,16 becomes two floats; 17.5 and 16
+
+
+      //below this comment and between setting newData to false is where you want to send the Rpi whatever data you want.
+      Serial.println(calibBool);
+
+      newData = false;
+
+      //sendDataToRpi(); //unused
+                   
+    }
+
+    bool buttonState = digitalRead(BUTTON_PIN);
+
+    if (lastButtonState == HIGH && buttonState == LOW) {
+      calibBool = 1;
+      Serial.println("Button is Pressed");
+    }
+    lastButtonState = buttonState;
+    commandMotors(); //we want this to happen outside of our newdata=true loop so it is never blocked
+}
+
+
+//======================================================
+
+
+void parseData(){
+  
+
+
+  char *strtokIndexer; //doing char * allows strtok to increment across my string properly frankly im not sure why... something to do with pointers that I dont expect students to understand
+
+  
+  strtokIndexer = strtok(tempChar,","); //sets strtokIndexer = to everything up to the first comma in tempChar /0 //this line is broken
+  leftMotor = atoi(strtokIndexer); //converts strtokIndexer into a int
+  
+
+  strtokIndexer= strtok(NULL, ","); //setting the first input to null causes strtok to continue looking for commas in tempChar starting from where it left off, im not really sure why 
+  rightMotor = atoi(strtokIndexer);
+
+  
+  //now that we have extracted the data from the Rpi as floats, we can use them to command actuators somewhere else in the code
+  
+}
+
+//==========================================
+
+
+//=======================================
+
+void commandMotors(){
+  m.setM1Speed(leftMotor);
+  m.setM2Speed(rightMotor);
+}
+
+
+//=========================================================
+
+
+void recvWithStartEndMarkers() {
+    static boolean recvInProgress = false;
+    static byte ndx = 0;
+    char startMarker = '<';
+    char endMarker = '>';
+    char rc;
+                                                               
+    while (Serial.available() > 0 && newData == false) {
+        rc = Serial.read();
+                                                             
+                                                                  
+        if (recvInProgress == true) {
+            if (rc != endMarker) {
+                receivedChars[ndx] = rc;
+                ndx++;
+                if (ndx >= numChars) {
+                    ndx = numChars - 1;
+                }
+            }
+            else {
+                receivedChars[ndx] = '\0'; // terminates the string, frankly unsure why I need this
+                recvInProgress = false;
+                ndx = 0;
+                newData = true;
+            }
+        }
+
+        else if (rc == startMarker) {
+            recvInProgress = true;
+        }
+    }
+}
+
+//==================================================================
