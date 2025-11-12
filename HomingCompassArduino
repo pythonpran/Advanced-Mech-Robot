@@ -1,0 +1,307 @@
+/****************************************************************
+ * ICM-20948 Magnetometer Calibration + Compass Heading
+ * Based on SparkFun Example1_Basics.ino
+ * 
+ * - Calibrates for 15 seconds while you rotate the sensor
+ * - Then continuously prints calibrated magnetometer data
+ *   and heading angle (0–360°)
+ * 
+ * Compatible with SparkFun 9DoF ICM-20948 (I2C)
+ ***************************************************************/
+
+#include <ICM_20948.h>
+ICM_20948_I2C myICM;
+#include <AStar32U4Motors.h>
+AStar32U4Motors m; //read the documentation of this library to understand what functions to use to drive the motors and how to use them
+
+#define SERIAL_PORT Serial
+#define WIRE_PORT Wire
+#define AD0_VAL 1  // Default for SparkFun breakout (ADR jumper open)
+
+const byte numChars = 32;
+char receivedChars[numChars];
+char tempChar[numChars]; // temporary array used for parsing
+
+//motor command variables
+int leftMotor=0; //int leftMotor
+int rightMotor=0;
+
+boolean newData = false;
+int calibBool = 0;
+
+const int BUTTON_PIN = 17; 
+bool lastButtonState = HIGH;
+int target = 60;
+int offset = 10;
+bool AlignBool = false;
+
+// Calibration variables
+float magMin[3] = { 9999, 9999, 9999 };
+float magMax[3] = {-9999,-9999,-9999 };
+float magOffset[3] = {0, 0, 0};
+
+float heading;
+
+void setup()
+{
+  SERIAL_PORT.begin(9600);
+  while (!SERIAL_PORT) {}
+  
+  pinMode(3, OUTPUT); //left motor
+  pinMode(2,OUTPUT); //Right motor 
+  pinMode(BUTTON_PIN, INPUT_PULLUP); 
+  
+  WIRE_PORT.begin();
+  WIRE_PORT.setClock(400000);
+
+  bool initialized = false;
+  while (!initialized)
+  {
+    myICM.begin(WIRE_PORT, AD0_VAL);
+    SERIAL_PORT.print("Initialization status: ");
+    SERIAL_PORT.println(myICM.statusString());
+    if (myICM.status != ICM_20948_Stat_Ok)
+    {
+      SERIAL_PORT.println("Retrying...");
+      delay(500);
+    }
+    else
+    {
+      initialized = true;
+    }
+  }
+
+  SERIAL_PORT.println("ICM initialized!");
+
+}
+
+void loop()
+{
+
+    bool buttonState = digitalRead(BUTTON_PIN);
+
+    if (lastButtonState == HIGH && buttonState == LOW) {
+      calibrateMagnetometer(15000); // 15 seconds
+      SERIAL_PORT.println("Calibration complete!");
+      
+      AlignBool = true;
+      Align();
+    }
+
+    lastButtonState = buttonState;
+    //commandMotors(); //we want this to happen outside of our newdata=true loop so it is never blocked
+}
+
+// =========================================================
+void calibrateMagnetometer(unsigned long durationMs)
+{
+  unsigned long startTime = millis();
+  SERIAL_PORT.println("Rotate the sensor in all directions...");
+
+  while (millis() - startTime < durationMs)
+  {
+    if (myICM.dataReady())
+    {
+      myICM.getAGMT();
+      float mx = myICM.magX();
+      float my = myICM.magY();
+      float mz = myICM.magZ();
+
+      // Update min/max
+      if (mx < magMin[0]) magMin[0] = mx;
+      if (my < magMin[1]) magMin[1] = my;
+      if (mz < magMin[2]) magMin[2] = mz;
+      if (mx > magMax[0]) magMax[0] = mx;
+      if (my > magMax[1]) magMax[1] = my;
+      if (mz > magMax[2]) magMax[2] = mz;
+
+      SERIAL_PORT.print(".");
+      delay(100);
+    }
+  }
+
+  // Compute offsets (bias)
+  for (int i = 0; i < 3; i++)
+  {
+    magOffset[i] = (magMax[i] + magMin[i]) / 2.0;
+  }
+
+  SERIAL_PORT.println();
+  SERIAL_PORT.println("Calibration results:");
+  SERIAL_PORT.print("Min: [ ");
+  printFormattedFloat(magMin[0], 6, 2); SERIAL_PORT.print(", ");
+  printFormattedFloat(magMin[1], 6, 2); SERIAL_PORT.print(", ");
+  printFormattedFloat(magMin[2], 6, 2); SERIAL_PORT.println(" ]");
+
+  SERIAL_PORT.print("Max: [ ");
+  printFormattedFloat(magMax[0], 6, 2); SERIAL_PORT.print(", ");
+  printFormattedFloat(magMax[1], 6, 2); SERIAL_PORT.print(", ");
+  printFormattedFloat(magMax[2], 6, 2); SERIAL_PORT.println(" ]");
+
+  SERIAL_PORT.print("Offsets (bias): [ ");
+  printFormattedFloat(magOffset[0], 6, 2); SERIAL_PORT.print(", ");
+  printFormattedFloat(magOffset[1], 6, 2); SERIAL_PORT.print(", ");
+  printFormattedFloat(magOffset[2], 6, 2); SERIAL_PORT.println(" ]");
+}
+
+// =========================================================
+void printFormattedFloat(float val, uint8_t leading, uint8_t decimals)
+{
+  float aval = abs(val);
+  if (val < 0) SERIAL_PORT.print("-");
+  else SERIAL_PORT.print(" ");
+
+  for (uint8_t indi = 0; indi < leading; indi++)
+  {
+    uint32_t tenpow = 0;
+    if (indi < (leading - 1)) tenpow = 1;
+    for (uint8_t c = 0; c < (leading - 1 - indi); c++) tenpow *= 10;
+    if (aval < tenpow) SERIAL_PORT.print("0");
+    else break;
+  }
+
+  if (val < 0) SERIAL_PORT.print(-val, decimals);
+  else SERIAL_PORT.print(val, decimals);
+}
+
+// =========================================================
+void Align()
+{
+
+   while(AlignBool){
+    ReadData();
+  if ((heading-target)>offset || (heading-target)<-offset){
+    SERIAL_PORT.println("heading>target");
+    SERIAL_PORT.println(heading);
+    leftMotor = -100;
+    rightMotor = 100;
+    commandMotors();
+    delay(1000);
+    leftMotor = 0;
+    rightMotor = -0;
+    delay(50);
+    commandMotors();
+  }else if (abs(heading-target)<offset){
+    SERIAL_PORT.println("heading=target");
+    SERIAL_PORT.println(heading);
+    leftMotor = 0;
+    rightMotor = 0;
+    AlignBool = false;
+  }else {
+    SERIAL_PORT.println("heading<target");
+    SERIAL_PORT.println(heading);
+    leftMotor = 100;
+    rightMotor = -100;
+    commandMotors();
+    delay(1000);
+    leftMotor = 0;
+    rightMotor = -0;
+    delay(50);
+    commandMotors();
+
+  }
+   }
+}
+
+// =========================================================
+void ReadData()
+{
+if (myICM.dataReady())
+  {
+    myICM.getAGMT();
+    float mx = myICM.magX() - magOffset[0];
+    float my = myICM.magY() - magOffset[1];
+    float mz = myICM.magZ() - magOffset[2];
+
+    // --- Compute heading (in degrees) ---
+    // Adjust if sensor orientation differs (you may need to swap/negate axes)
+    heading = atan2(my, mx) * 180.0 / PI;
+    if (heading < 0) heading += 360.0;
+
+    // --- Print data ---
+    //SERIAL_PORT.print("Calibrated Mag (uT): [ ");
+    //printFormattedFloat(mx, 6, 2);
+    //SERIAL_PORT.print(", ");
+    //printFormattedFloat(my, 6, 2);
+    //SERIAL_PORT.print(", ");
+    //printFormattedFloat(mz, 6, 2);
+    //SERIAL_PORT.print(" ]  |  Heading: ");
+    //printFormattedFloat(heading, 6, 2);
+    //SERIAL_PORT.println("°");
+  }
+  else
+  {
+    //SERIAL_PORT.println("Waiting for data...");
+  } 
+
+}
+//======================================================
+
+
+void parseData(){
+  
+
+
+  char *strtokIndexer; //doing char * allows strtok to increment across my string properly frankly im not sure why... something to do with pointers that I dont expect students to understand
+
+  
+  strtokIndexer = strtok(tempChar,","); //sets strtokIndexer = to everything up to the first comma in tempChar /0 //this line is broken
+  //leftMotor = atoi(strtokIndexer); //converts strtokIndexer into a int
+  
+
+  strtokIndexer= strtok(NULL, ","); //setting the first input to null causes strtok to continue looking for commas in tempChar starting from where it left off, im not really sure why 
+  //rightMotor = atoi(strtokIndexer);
+
+  
+  //now that we have extracted the data from the Rpi as floats, we can use them to command actuators somewhere else in the code
+  
+}
+
+//==========================================
+
+
+//=======================================
+
+void commandMotors(){
+  m.setM1Speed(leftMotor);
+  m.setM2Speed(rightMotor);
+}
+
+
+//=========================================================
+
+
+void recvWithStartEndMarkers() {
+    static boolean recvInProgress = false;
+    static byte ndx = 0;
+    char startMarker = '<';
+    char endMarker = '>';
+    char rc;
+                                                               
+    while (Serial.available() > 0 && newData == false) {
+        rc = Serial.read();
+                                                             
+                                                                  
+        if (recvInProgress == true) {
+            if (rc != endMarker) {
+                receivedChars[ndx] = rc;
+                ndx++;
+                if (ndx >= numChars) {
+                    ndx = numChars - 1;
+                }
+            }
+            else {
+                receivedChars[ndx] = '\0'; // terminates the string, frankly unsure why I need this
+                recvInProgress = false;
+                ndx = 0;
+                newData = true;
+            }
+        }
+
+        else if (rc == startMarker) {
+            recvInProgress = true;
+        }
+    }
+}
+
+//==================================================================
