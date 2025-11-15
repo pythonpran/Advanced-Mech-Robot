@@ -59,7 +59,7 @@ const int encoderResolution = 1440;  // counts per revolution
 const double wheelDiameter = 2.7559055; // inches
 const double d = 2.7559055; // inches
 const double wheelRadius = wheelDiameter / 2.0;
-const double interval = 5; // control loop every 5 ms (200 Hz)
+const double interval = 15; // control loop every 5 ms (200 Hz)
 
 // ================= PID VARIABLES =================
 float Kp_l = 0.39;
@@ -79,8 +79,8 @@ int posRightCountLast = 0;
 float corr_r = 1;
 float corr_l = 1;
 
-float leftMotorCmd;
-float rightMotorCmd;
+float leftMotorCmd = 0;
+float rightMotorCmd = 0;
 
 double newVelLeft = 0, newVelRight = 0;
 double velLeft = 0, velRight = 0;
@@ -91,6 +91,7 @@ double posRightRad = 0.0; // this will need to be converted to rad/sec
 int posLeftCount = 0;
 int posRightCount = 0;
 unsigned long currentMillis;
+unsigned long prevMillis;
 double dtlastL = 0;double dtL = 0;
 double dtlastR = 0;double dtR = 0;
 double interval2L;
@@ -149,7 +150,7 @@ void setup()
 
 void loop()
 {
-  
+    currentMillis = millis();
 
     recvWithStartEndMarkers(); //this function is in charge of taking a peice of data that looks like <17,16> 
                                //turning it into a string looking like 17,16 and then setting newdata to true,
@@ -162,7 +163,11 @@ void loop()
 
 
       //below this comment and between setting newData to false is where you want to send the Rpi whatever data you want.
-      Serial.println(startAligning);
+      Serial.print(startAligning);
+      Serial.print(",");
+      Serial.print(linePosition);
+      Serial.print(",");
+      Serial.println(isCross);
 
       newData = false;
 
@@ -189,7 +194,7 @@ void loop()
       } else if (counter ==2) {
           calibrateSensors();
           SERIAL_PORT.println("Line Following Calibration complete!");
-  }
+        }
       
       AlignBool = true;
       //Align();
@@ -209,7 +214,6 @@ void loop()
     //Serial.print(sensorValues[i]);
     //Serial.print('\t');
     }
-    
     
     // REPAIR NUMBER 2: checking if all my sensorvalues are zero and then setting lineposition to zero,sometimes if all sensorvalues are zero lineposition will be set to 7k and this fixes that
     if (sensorValues[0]==0 && sensorValues[1]==0 && sensorValues[2]==0 && sensorValues[3]==0 && sensorValues[4]==0 && sensorValues[5]==0 && sensorValues[6]==0 && sensorValues[7]==0){
@@ -241,10 +245,23 @@ void loop()
         isCross = 0;
       }
     //Serial.println(linePosition);
-//now linePosition returns a value between 1000 and 5000 that is proportonal to the sensor's position relative to the line, and the value isCross is set to 1 when both sensor 0 and 7 are over a line
+    //now linePosition returns a value between 1000 and 5000 that is proportonal to the sensor's position relative to the line, and the value isCross is set to 1 when both sensor 0 and 7 are over a line
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////END OF REPAIRS TO LINEPOSITION///////////////////////////////////////////////////////////////////////////
+    
+    if (currentMillis - prevMillis >= interval) {
+    prevMillis = currentMillis;
+    //leftMotor = 15;//Tuning
+    //rightMotor = 15;//Tuning
+    //Serial.print(computeLinearVelocityLeft());
+    newVelLeft = drivePIDL(computeLinearVelocityLeft(), leftMotor, corr_l*Kp_l, corr_l*Ki_l, corr_l*Kd_l);
+    newVelRight = drivePIDR(computeLinearVelocityRight(), rightMotor, corr_r*Kp_r, corr_r*Ki_r, corr_r*Kd_r);
+    leftMotorCmd = motorVelToSpeedCommand(newVelLeft, leftMotorMax);
+    rightMotorCmd = motorVelToSpeedCommand(newVelRight, rightMotorMax);
+    commandMotors(leftMotorCmd,rightMotorCmd);
+    }
+
 }
 
 void calibrateMagnetometer(unsigned long durationMs)
@@ -329,11 +346,17 @@ void Align()
     SERIAL_PORT.println(heading);
     leftMotor = -10;
     rightMotor = 10;
+    
+    if (currentMillis - prevMillis >= interval) {
+
+    prevMillis = currentMillis;
     newVelLeft = drivePIDL(computeLinearVelocityLeft(), leftMotor, corr_l*Kp_l, corr_l*Ki_l, corr_l*Kd_l);
     newVelRight = drivePIDR(computeLinearVelocityRight(), rightMotor, corr_r*Kp_r, corr_r*Ki_r, corr_r*Kd_r);
     leftMotorCmd = motorVelToSpeedCommand(newVelLeft, leftMotorMax);
     rightMotorCmd = motorVelToSpeedCommand(newVelRight, rightMotorMax);
     commandMotors(leftMotorCmd,rightMotorCmd);
+    }
+    
     delay(1000);
     leftMotorCmd = 0;
     rightMotorCmd = 0;
@@ -405,11 +428,10 @@ void parseData(){
 
   
   strtokIndexer = strtok(tempChar,","); //sets strtokIndexer = to everything up to the first comma in tempChar /0 //this line is broken
-  //leftMotor = atoi(strtokIndexer); //converts strtokIndexer into a int
-  
+  leftMotor = atoi(strtokIndexer); //converts strtokIndexer into a int
 
   strtokIndexer= strtok(NULL, ","); //setting the first input to null causes strtok to continue looking for commas in tempChar starting from where it left off, im not really sure why 
-  //rightMotor = atoi(strtokIndexer);
+  rightMotor = atoi(strtokIndexer);
 
   
   //now that we have extracted the data from the Rpi as floats, we can use them to command actuators somewhere else in the code
