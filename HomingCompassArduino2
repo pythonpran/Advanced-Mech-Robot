@@ -120,7 +120,8 @@ void setup()
 
     //arduino pin sensornames I am using: 7, 18, 23 aka A5. note:PIN A1 DID NOT WORK WITH ANY SENSOR!!, 20, 21, 22, 8, 6. UNHOOK THE BLUE JUMPER LABELED BUZZER ON THE ASTAR or pin 6 will cause the buzzer to activate.
     //qtr.setSensorPins((const uint8_t[]){7, 18, 23, 20, 21, 22, 4, 6}, SensorCount);
-    qtr.setSensorPins((const uint8_t[]){4, 6, 23, 22, 23, 19, 20, 21}, SensorCount);
+    //qtr.setSensorPins((const uint8_t[]){4, 6, 23, 22, 23, 19, 20, 21}, SensorCount);
+    qtr.setSensorPins((const uint8_t[]){18, 7, 20, 21, 22, 23, 6, 4}, SensorCount);
     qtr.setEmitterPin(5); //can get away with a single emitter pin providing power to both emitters
     QTRReadMode::On; //emitters on measures active reflectance instead of ambient light levels, better becasue the ambient light level will change as the robot moves around the board but the reflectance levels will not
      
@@ -245,6 +246,22 @@ void loop()
         isCross = 0;
       }
     //Serial.println(linePosition);
+      Serial.print(sensorValues[0]);
+      Serial.print(",");
+      Serial.print(sensorValues[1]);
+      Serial.print(",");
+      Serial.print(sensorValues[2]);
+      Serial.print(",");
+      Serial.print(sensorValues[3]);
+      Serial.print(",");
+      Serial.print(sensorValues[4]);
+      Serial.print(",");
+      Serial.print(sensorValues[5]);
+      Serial.print(",");
+      Serial.print(sensorValues[6]);
+      Serial.print(",");
+      Serial.println(sensorValues[7]);
+      delay(50);
     //now linePosition returns a value between 1000 and 5000 that is proportonal to the sensor's position relative to the line, and the value isCross is set to 1 when both sensor 0 and 7 are over a line
 
 
