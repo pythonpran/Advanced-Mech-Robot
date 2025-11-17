@@ -1,0 +1,164 @@
+#!/usr/bin/env python
+
+import RPi.GPIO as GPIO
+import time
+import serial
+import asyncio
+import numpy as np
+from sendStringScript import sendString
+
+state = "idle"
+x=int(0)
+leftMotor=int(10)
+rightMotor=int(10)
+
+intersection_counter = 0
+counter = 0
+crossprev = 0
+counter2 = 0
+
+sensor_L = 4
+sensor_M = 17
+sensor_R = 18
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(sensor_L,GPIO.IN)
+GPIO.setup(sensor_M,GPIO.IN)
+GPIO.setup(sensor_R,GPIO.IN)
+
+def IRcheck(sensor):
+	time.sleep(0.5)
+	irValue = GPIO.input(sensor)
+	if irValue:
+		IR = 0
+		print(f"NOT DETECTED Sensor {sensor}")
+				
+	else:
+		IR = 1
+		print(f"DETECTED Sensor {sensor}")
+
+	return IR
+          
+def count():
+    global counter, crossprev, cross
+    if cross==1 and crossprev!=1:
+        counter +=1
+        crossprev=cross
+        #print(counter) 
+    else :
+        crossprev=cross
+
+        return counter
+
+
+    # --- Main loop ---
+if __name__ == '__main__':
+    ser=serial.Serial('/dev/ttyACM0',9600)
+    ser.reset_input_buffer() #clears anything the arduino has been sending while the Rpi isnt prepared to recieve.
+
+    while True:
+        sendString('/dev/ttyACM0',9600,'<'+str(leftMotor)+','+str(rightMotor)+'>',0.0001)
+        
+        if ser.in_waiting > 0:  #we wait until the arduino has sent something to us before we try to read anything from the serial port.
+                 
+                line = ser.readline().decode('utf-8')
+                line=line.split(',')
+                #print(line)
+                #this splits the incoming string up by commas
+                try:                  
+                    x=int(line[0])
+                    pos=int(line[1])
+                    cross=int(line[2])
+                    #print([x,pos,cross])
+                    intersection_counter = count()
+                    if pos < 500:
+                        state="Indeterminant" 
+                except:
+                    print("packet dropped") #this is designed to catch when python shoves bits on top of each other.                 
+          
+        match state:
+            case "idle":
+                print("idle")
+                #if x==1: 
+                #state = "initialForward"
+                state = "Destination"
+            case "initialForward":
+                print("initialForward")
+                leftMotor = 15
+                rightMotor = 15
+                if cross ==1:
+                    leftMotor = 0
+                    rightMotor = 0
+                    state = "turnRight"
+            case "turnRight":
+                print("turnRight")
+                leftMotor=10  
+                rightMotor=-10
+                time.sleep(.9)
+                counter = 0    
+                state = "Following"
+            case "Following":
+                print("Line Following")
+                error = (pos-3500)/3500
+                #rightMotor=0.2*(1+.02*pos)  
+                #leftMotor=0.2*(141-.02*pos)
+                rightMotor = max(0,min(20,10 - 10*error))
+                leftMotor = max(0,min(20,10 + 10*error))
+                print(leftMotor,rightMotor)
+                if counter == 1 and counter2 == 0:
+                    state = "turnLeft"
+                elif counter == 2:
+                    state = "Destination"
+            case "turnLeft":
+                print("turnLeft")
+                leftMotor=-10  
+                rightMotor=10
+                time.sleep(.9)
+                counter2 = 1   
+                state = "Following"
+            case "Destination":
+                print("Destination")
+                leftMotor, rightMotor = (0, 0);
+                L =  IRcheck(sensor_L)
+                M =  IRcheck(sensor_M)
+                R =  IRcheck(sensor_R)
+                #if L ==1 :
+                 #   state = "shootLeft"
+                #elif M ==1:
+                 #    state = "shootMid"
+                #elif R == 1:
+                 #    state = "shootRight"
+            case "shootLeft":
+                print("shootLeft")
+                leftMotor=-10  
+                rightMotor=10
+                time.sleep(.5)
+                leftMotor=0  
+                rightMotor=0
+                time.sleep(3)
+                leftMotor=10  
+                rightMotor=-10
+                time.sleep(.5)
+                state = "Destination"
+            case "shootRight":
+                print("shootRight")
+                leftMotor=10  
+                rightMotor=-10
+                time.sleep(.5)
+                leftMotor=0  
+                rightMotor=0
+                time.sleep(3) 
+                leftMotor=-10  
+                rightMotor=10
+                time.sleep(.5)
+                state = "Destination" 
+            case "shootMid":
+                print("shootMid")
+                leftMotor=0  
+                rightMotor=0
+                time.sleep(3) 
+                state = "Destination"   
+            case "Indeterminant":
+                print("Indeterminant")
+                leftMotor, rightMotor = (0, 0);
+                if pos > 500:
+                    state = "Following"
