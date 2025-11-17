@@ -20,10 +20,14 @@ counter2 = 0
 sensor_L = 4
 sensor_M = 17
 sensor_R = 18
+TRIG_1 = 27
+ECHO_1 = 22
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(sensor_L,GPIO.IN)
 GPIO.setup(sensor_M,GPIO.IN)
 GPIO.setup(sensor_R,GPIO.IN)
+GPIO.setup(TRIG_1, GPIO.OUT)
+GPIO.setup(ECHO_1, GPIO.IN)
 
 def IRcheck(sensor):
 	time.sleep(0.5)
@@ -37,7 +41,35 @@ def IRcheck(sensor):
 		print(f"DETECTED Sensor {sensor}")
 
 	return IR
-          
+
+def get_distance(TRIG,ECHO):
+    """Measure distance using HC-SR04 (in cm)."""
+    # Ensure trigger is LOW
+    GPIO.output(TRIG, False)
+    time.sleep(0.05)
+
+    # Send 10µs pulse
+    GPIO.output(TRIG, True)
+    time.sleep(0.00001)
+    GPIO.output(TRIG, False)
+
+    # Wait for echo start
+    start = time.time()
+    timeout = start + 0.02  # 20ms safety timeout
+    while GPIO.input(ECHO) == 0 and time.time() < timeout:
+        start = time.time()
+
+    # Wait for echo end
+    stop = time.time()
+    timeout = stop + 0.02
+    while GPIO.input(ECHO) == 1 and time.time() < timeout:
+        stop = time.time()
+
+    # Compute distance
+    elapsed = stop - start
+    distance_cm = (elapsed * 34300) / 2
+    return round(distance_cm, 2)
+     
 def count():
     global counter, crossprev, cross
     if cross==1 and crossprev!=1:
@@ -48,7 +80,6 @@ def count():
         crossprev=cross
 
         return counter
-
 
     # --- Main loop ---
 if __name__ == '__main__':
@@ -80,7 +111,8 @@ if __name__ == '__main__':
                 print("idle")
                 #if x==1: 
                 #state = "initialForward"
-                state = "Destination"
+                
+                #state = "Destination"
             case "initialForward":
                 print("initialForward")
                 leftMotor = 15
@@ -88,30 +120,50 @@ if __name__ == '__main__':
                 if cross ==1:
                     leftMotor = 0
                     rightMotor = 0
-                    state = "turnRight"
-            case "turnRight":
-                print("turnRight")
+                    dist_1 = get_distance(TRIG_1,ECHO_1)
+                    if dist_1 > 1000:
+                        inTurn = 1
+                        state = "turnRight1"
+                    else: 
+                        inTurn = 0
+                        state = "turnLeft1"
+            case "turnRight1":
+                print("Initial Turn Right")
                 leftMotor=10  
                 rightMotor=-10
+                time.sleep(.9)
+                counter = 0    
+                state = "Following"
+            case "turnLeft1":
+                print("Initial Turn Left")
+                leftMotor=-10  
+                rightMotor=10
                 time.sleep(.9)
                 counter = 0    
                 state = "Following"
             case "Following":
                 print("Line Following")
                 error = (pos-3500)/3500
-                #rightMotor=0.2*(1+.02*pos)  
-                #leftMotor=0.2*(141-.02*pos)
                 rightMotor = max(0,min(20,10 - 10*error))
                 leftMotor = max(0,min(20,10 + 10*error))
                 print(leftMotor,rightMotor)
-                if counter == 1 and counter2 == 0:
+                if counter == 1 and counter2 == 0 and inTurn == 0:
                     state = "turnLeft"
+                elif counter == 1 and counter2 == 0 and inTurn == 1:
+                    state = "turnRight"
                 elif counter == 2:
                     state = "Destination"
             case "turnLeft":
                 print("turnLeft")
                 leftMotor=-10  
                 rightMotor=10
+                time.sleep(.9)
+                counter2 = 1   
+                state = "Following"
+            case "turnRight":
+                print("turnRight")
+                leftMotor=10  
+                rightMotor=-10
                 time.sleep(.9)
                 counter2 = 1   
                 state = "Following"
