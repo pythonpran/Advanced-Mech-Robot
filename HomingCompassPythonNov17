@@ -9,13 +9,14 @@ from sendStringScript import sendString
 
 state = "idle"
 x=int(0)
-leftMotor=int(10)
-rightMotor=int(10)
+leftMotor=int(0)
+rightMotor=int(0)
 
 intersection_counter = 0
 counter = 0
 crossprev = 0
 counter2 = 0
+inTurn = 0
 
 sensor_L = 4
 sensor_M = 17
@@ -99,9 +100,12 @@ if __name__ == '__main__':
                     x=int(line[0])
                     pos=int(line[1])
                     cross=int(line[2])
+                    #L=float(line[3])
+                    #R=float(line[4])
                     #print([x,pos,cross])
+                    #print(L,R)
                     intersection_counter = count()
-                    if pos < 500:
+                    if pos < 500 and state != "initialForward" and state != "idle":
                         state="Indeterminant" 
                 except:
                     print("packet dropped") #this is designed to catch when python shoves bits on top of each other.                 
@@ -109,14 +113,14 @@ if __name__ == '__main__':
         match state:
             case "idle":
                 print("idle")
-                #if x==1: 
-                #state = "initialForward"
+                if x==1: 
+                    state = "initialForward"
                 
-                #state = "Destination"
+                #state = "Following"
             case "initialForward":
                 print("initialForward")
-                leftMotor = 15
-                rightMotor = 15
+                leftMotor = 5
+                rightMotor = 5
                 if cross ==1:
                     leftMotor = 0
                     rightMotor = 0
@@ -129,24 +133,24 @@ if __name__ == '__main__':
                         state = "turnLeft1"
             case "turnRight1":
                 print("Initial Turn Right")
-                leftMotor=10  
-                rightMotor=-10
+                leftMotor=5  
+                rightMotor=-5
                 time.sleep(.9)
                 counter = 0    
                 state = "Following"
             case "turnLeft1":
                 print("Initial Turn Left")
-                leftMotor=-10  
-                rightMotor=10
+                leftMotor=-5  
+                rightMotor=5
                 time.sleep(.9)
                 counter = 0    
                 state = "Following"
             case "Following":
                 print("Line Following")
                 error = (pos-3500)/3500
-                rightMotor = max(0,min(20,10 - 10*error))
-                leftMotor = max(0,min(20,10 + 10*error))
-                print(leftMotor,rightMotor)
+                rightMotor = max(0,min(20,2 - 3*error))
+                leftMotor = max(0,min(20,2 + 3*error))
+                print("PID: ",leftMotor,rightMotor)
                 if counter == 1 and counter2 == 0 and inTurn == 0:
                     state = "turnLeft"
                 elif counter == 1 and counter2 == 0 and inTurn == 1:
@@ -155,15 +159,15 @@ if __name__ == '__main__':
                     state = "Destination"
             case "turnLeft":
                 print("turnLeft")
-                leftMotor=-10  
-                rightMotor=10
+                leftMotor=-5  
+                rightMotor=5
                 time.sleep(.9)
                 counter2 = 1   
                 state = "Following"
             case "turnRight":
                 print("turnRight")
-                leftMotor=10  
-                rightMotor=-10
+                leftMotor=5  
+                rightMotor=-5
                 time.sleep(.9)
                 counter2 = 1   
                 state = "Following"
@@ -181,26 +185,26 @@ if __name__ == '__main__':
                  #    state = "shootRight"
             case "shootLeft":
                 print("shootLeft")
-                leftMotor=-10  
-                rightMotor=10
+                leftMotor=-5  
+                rightMotor=5
                 time.sleep(.5)
                 leftMotor=0  
                 rightMotor=0
                 time.sleep(3)
-                leftMotor=10  
-                rightMotor=-10
+                leftMotor=5  
+                rightMotor=-5
                 time.sleep(.5)
                 state = "Destination"
             case "shootRight":
                 print("shootRight")
-                leftMotor=10  
-                rightMotor=-10
+                leftMotor=5  
+                rightMotor=-5
                 time.sleep(.5)
                 leftMotor=0  
                 rightMotor=0
                 time.sleep(3) 
-                leftMotor=-10  
-                rightMotor=10
+                leftMotor=-5  
+                rightMotor=5
                 time.sleep(.5)
                 state = "Destination" 
             case "shootMid":
