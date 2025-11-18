@@ -17,8 +17,8 @@ char receivedChars[numChars];
 char tempChar[numChars]; // temporary array used for parsing
 
 //motor command variables
-int leftMotor=0; //int leftMotor
-int rightMotor=0;
+float leftMotor=0; 
+float rightMotor=0;
 
 boolean newData = false;
 int calibBool = 0;
@@ -30,7 +30,7 @@ const int BUTTON_PIN2 = 14;
 bool lastButtonState2 = HIGH;
 
 int target = 60;
-int offset = 10;
+int offset = 5;
 bool AlignBool = false;
 
 // Calibration variables
@@ -56,10 +56,8 @@ Encoder encoderRight(encoderRightPinA, encoderRightPinB);
 Encoder encoderLeft(encoderLeftPinA, encoderLeftPinB);
 
 const int encoderResolution = 1440;  // counts per revolution
-const double wheelDiameter = 2.7559055; // inches
 const double d = 2.7559055; // inches
-const double wheelRadius = wheelDiameter / 2.0;
-const double interval = 15; // control loop every 5 ms (200 Hz)
+const int interval = 15; // control loop every 5 ms (200 Hz)
 
 // ================= PID VARIABLES =================
 float Kp_l = 2.1;
@@ -78,8 +76,8 @@ const double rightMotorMin = -39.14;
 int posLeftCountLast = 0;
 int posRightCountLast = 0;
 
-float corr_r = 1;
-float corr_l = 1;
+int corr_r = 1;
+int corr_l = 1;
 
 float leftMotorCmd = 0;
 float rightMotorCmd = 0;
@@ -134,8 +132,8 @@ void setup()
   while (!initialized)
   {
     myICM.begin(WIRE_PORT, AD0_VAL);
-    SERIAL_PORT.print("Initialization status: ");
-    SERIAL_PORT.println(myICM.statusString());
+    //SERIAL_PORT.print("Initialization status: ");
+    //SERIAL_PORT.println(myICM.statusString());
     if (myICM.status != ICM_20948_Stat_Ok)
     {
       SERIAL_PORT.println("Retrying...");
@@ -147,7 +145,7 @@ void setup()
     }
   }
 
-  SERIAL_PORT.println("ICM initialized!");
+  //SERIAL_PORT.println("ICM initialized!");
 
 }
 
@@ -173,6 +171,10 @@ void loop()
       Serial.print(linePosition);
       Serial.print(",");
       Serial.println(isCross);
+      //Serial.print(",");
+      //Serial.print(leftMotor);
+      //Serial.print(",");
+      //Serial.println(rightMotor);
 
       newData = false;
 
@@ -183,6 +185,8 @@ void loop()
     bool buttonState2 = digitalRead(BUTTON_PIN2);
 
     if (lastButtonState2 == HIGH && buttonState2 == LOW) {
+      AlignBool = true;
+      Align();
       startAligning = 1;
     }
     lastButtonState2 = buttonState2;
@@ -201,8 +205,7 @@ void loop()
           SERIAL_PORT.println("Line Following Calibration complete!");
         }
       
-      AlignBool = true;
-      //Align();
+
     }
 
     lastButtonState = buttonState;
@@ -273,8 +276,8 @@ void loop()
     
     if (currentMillis - prevMillis >= 3*interval) {
     prevMillis = currentMillis;
-    leftMotor = 10;//Tuning
-    rightMotor = 10;//Tuning
+    //leftMotor = 5;//Tuning
+    //rightMotor = 5;//Tuning
     velLeft = computeLinearVelocityLeft();
     velRight = computeLinearVelocityRight();
     newVelLeft = drivePIDL(velLeft, leftMotor, corr_l*Kp_l, corr_l*Ki_l, corr_l*Kd_l);
@@ -327,22 +330,22 @@ void calibrateMagnetometer(unsigned long durationMs)
     magOffset[i] = (magMax[i] + magMin[i]) / 2.0;
   }
 
-  SERIAL_PORT.println();
-  SERIAL_PORT.println("Calibration results:");
-  SERIAL_PORT.print("Min: [ ");
-  printFormattedFloat(magMin[0], 6, 2); SERIAL_PORT.print(", ");
-  printFormattedFloat(magMin[1], 6, 2); SERIAL_PORT.print(", ");
-  printFormattedFloat(magMin[2], 6, 2); SERIAL_PORT.println(" ]");
+  //SERIAL_PORT.println();
+  //SERIAL_PORT.println("Calibration results:");
+  //SERIAL_PORT.print("Min: [ ");
+  //printFormattedFloat(magMin[0], 6, 2); SERIAL_PORT.print(", ");
+  //printFormattedFloat(magMin[1], 6, 2); SERIAL_PORT.print(", ");
+  //printFormattedFloat(magMin[2], 6, 2); SERIAL_PORT.println(" ]");
 
-  SERIAL_PORT.print("Max: [ ");
-  printFormattedFloat(magMax[0], 6, 2); SERIAL_PORT.print(", ");
-  printFormattedFloat(magMax[1], 6, 2); SERIAL_PORT.print(", ");
-  printFormattedFloat(magMax[2], 6, 2); SERIAL_PORT.println(" ]");
+  //SERIAL_PORT.print("Max: [ ");
+  //printFormattedFloat(magMax[0], 6, 2); SERIAL_PORT.print(", ");
+  //printFormattedFloat(magMax[1], 6, 2); SERIAL_PORT.print(", ");
+  //printFormattedFloat(magMax[2], 6, 2); SERIAL_PORT.println(" ]");
 
-  SERIAL_PORT.print("Offsets (bias): [ ");
-  printFormattedFloat(magOffset[0], 6, 2); SERIAL_PORT.print(", ");
-  printFormattedFloat(magOffset[1], 6, 2); SERIAL_PORT.print(", ");
-  printFormattedFloat(magOffset[2], 6, 2); SERIAL_PORT.println(" ]");
+  //SERIAL_PORT.print("Offsets (bias): [ ");
+  //printFormattedFloat(magOffset[0], 6, 2); SERIAL_PORT.print(", ");
+  //printFormattedFloat(magOffset[1], 6, 2); SERIAL_PORT.print(", ");
+  //printFormattedFloat(magOffset[2], 6, 2); SERIAL_PORT.println(" ]");
 }
 
 // =========================================================
@@ -370,16 +373,20 @@ void Align()
 {
 
    while(AlignBool){
+    currentMillis = millis();
+    posRightCount = encoderRight.read(); 
+    posLeftCount = encoderLeft.read();
     ReadData();
   if ((heading-target)>offset || (heading-target)<-offset){
-    SERIAL_PORT.println("heading>target");
-    SERIAL_PORT.println(heading);
-      if (heading - target > 180){
-      leftMotor = -10;
-      rightMotor = 10;
+      //SERIAL_PORT.println("heading>target");
+      //SERIAL_PORT.println(heading);
+      if (heading>target and heading - target < 180){
+      leftMotor = 2;
+      rightMotor = -2;
+      //SERIAL_PORT.println("inside");
       } else {
-        leftMotor = 10;
-        rightMotor = -10;
+        leftMotor = -2;
+        rightMotor = 2;
       }
       
     if (currentMillis - prevMillis >= interval) {
@@ -394,14 +401,16 @@ void Align()
     commandMotors(leftMotorCmd,rightMotorCmd);
     }
     
-    delay(1000);
+    delay(500);
     leftMotorCmd = 0;
     rightMotorCmd = 0;
     commandMotors(leftMotorCmd,rightMotorCmd);
     delay(50);
-  }else (abs(heading-target)<offset){
-    SERIAL_PORT.println("heading=target");
-    SERIAL_PORT.println(heading);
+  }else {
+    //SERIAL_PORT.println("heading=target");
+    //SERIAL_PORT.println(heading);
+    leftMotor = 0;
+    rightMotor = 0;
     leftMotorCmd = 0;
     rightMotorCmd = 0;
     commandMotors(leftMotorCmd,rightMotorCmd);
@@ -453,10 +462,10 @@ void parseData(){
 
   
   strtokIndexer = strtok(tempChar,","); //sets strtokIndexer = to everything up to the first comma in tempChar /0 //this line is broken
-  //leftMotor = atoi(strtokIndexer); //converts strtokIndexer into a int
+  leftMotor = atof(strtokIndexer); //converts strtokIndexer into a int
 
   strtokIndexer= strtok(NULL, ","); //setting the first input to null causes strtok to continue looking for commas in tempChar starting from where it left off, im not really sure why 
-  //rightMotor = atoi(strtokIndexer);
+  rightMotor = atof(strtokIndexer);
 
   
   //now that we have extracted the data from the Rpi as floats, we can use them to command actuators somewhere else in the code
@@ -567,8 +576,8 @@ double drivePIDR(double curr, double setpoint, double kp, double ki, double kd) 
     rateErrorR = (errorR-lastSpeedErrorR)/elapsedTimeR;      // Derivative Error
 
     double outR = kp*errorR+ki*cumErrorR+kd*rateErrorR;   // PID output
-    Serial.print("outRight:");
-    Serial.println(outR);
+    //Serial.print("outRight:");
+    //Serial.println(outR);
     //Serial.println(outR);
     lastSpeedErrorR = errorR;                              // remember current error
     priorTimeR = currentTimeR;                             // remember current time
@@ -590,8 +599,8 @@ double computeLinearVelocityRight() {
      diffRight = posRightCount - posRightCountLast;
      posRightRad = ((2*PI)/encoderResolution)*(diffRight/interval2R)*1000; 
      velRight = (d/2)*posRightRad; // Now convert to get inches/sec (tangential velocity)
-     Serial.print("velRight:");
-     Serial.println(velRight);
+     //Serial.print("velRight:");
+     //Serial.println(velRight);
      posRightCountLast = posRightCount;
      dtlastR=dtR;
   return velRight;
