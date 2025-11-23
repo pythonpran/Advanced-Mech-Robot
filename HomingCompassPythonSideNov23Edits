@@ -11,8 +11,10 @@ from sendStringScript import sendString
 pi = pigpio.pi()
 state = "idle"
 x=int(0)
-leftMotor=int(0)
-rightMotor=int(0)
+#leftMotor=int(0)
+#rightMotor=int(0)
+leftMotor=float(0)
+rightMotor=float(0)
 target = float(0)
 heading = float(0)
 start = int(0)
@@ -60,8 +62,10 @@ GPIO.setmode(GPIO.BCM)
 GPIO.setup(sensor_L,GPIO.IN)
 GPIO.setup(sensor_M,GPIO.IN)
 GPIO.setup(sensor_R,GPIO.IN)
-GPIO.setup(TRIG_1, GPIO.OUT)
-GPIO.setup(ECHO_1, GPIO.IN)
+#GPIO.setup(TRIG_1, GPIO.OUT)
+#GPIO.setup(ECHO_1, GPIO.IN)
+GPIO.setup(TRIG, GPIO.OUT)
+GPIO.setup(ECHO, GPIO.IN)
 GPIO.setup(MOTOR_IN1, GPIO.OUT)
 GPIO.setup(MOTOR_IN2, GPIO.OUT)
 GPIO.setup(MOTOR_EN,  GPIO.OUT)
@@ -183,8 +187,9 @@ if __name__ == '__main__':
             case "idle":
                 print("idle")
                 #if x==1: 
-                    #state = "initialForward"
+                    #state = "align"
                 state = "align"
+				#state = "done"
             case "align":
                 print("Align")
                 print("Heading: ",heading)
@@ -199,16 +204,16 @@ if __name__ == '__main__':
                 print("initialForward")
                 leftMotor = 2
                 rightMotor = 2
-                if cross ==1:
+                if cross == 1:
                     leftMotor = 0
                     rightMotor = 0
                     #dist_1 = get_distance(TRIG_1,ECHO_1)
 					#dist_1 = update_ultrasonic()
-                    #if dist_1 > 1000:
-                        #inTurn = 1
+                    #if dist_1 > 91.44:
+                        #inTurn = 0
                         #state = "turnRight1"
                     #else: 
-                        #inTurn = 0
+                        #inTurn = 1
                         #state = "turnLeft1"
                     inTurn = 1
                     state = "turnLeft1"
@@ -298,7 +303,7 @@ if __name__ == '__main__':
             case "shoot_Left":
                 print("shoot_Left")
                 now = time.time()
-                if now-last_time2 > 5:
+                if now-last_time2 > 2:
                     #last_time2 = now
                     last_time3 = time.time()
                     state = "shoot_Left2"
@@ -340,7 +345,7 @@ if __name__ == '__main__':
                 print("feedDelayLeft")
                 now = time.time()
                 if now-last_time3 > 1:
-                    #last_time2 = now
+                    #last_time3 = now
 					last_time4 = time.time()
                     state = "shootingLeft"
 			case "shootingLeft":
@@ -387,7 +392,7 @@ if __name__ == '__main__':
             case "shoot_Right":
                 print("shoot_Right")
                 now = time.time()
-                if now-last_time2 > 5:
+                if now-last_time2 > 2:
                     #last_time2 = now
                     last_time3 = time.time()
                     state = "shoot_Right2"
@@ -429,7 +434,7 @@ if __name__ == '__main__':
                 print("feedDelayRight")
                 now = time.time()
                 if now-last_time3 > 1:
-                    #last_time2 = now
+                    #last_time3 = now
 					last_time4 = time.time()
                     state = "shootingRight"
 			case "shootingRight":
