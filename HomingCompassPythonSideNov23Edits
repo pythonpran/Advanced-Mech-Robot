@@ -36,18 +36,25 @@ MIN_PULSE = 620
 MAX_PULSE = 2285
 currentPulse = MIN_PULSE
 step = STEP_SIZE
+shoot_delay = 0.650
 
 sensor_L = 4
 sensor_M = 18
 sensor_R = 22
-TRIG_1 = 23
-ECHO_1 = 24
+#TRIG_1 = 23
+#ECHO_1 = 24
+TRIG = 23
+ECHO = 24
 
 SERVO_PIN = 13
 MOTOR_IN1 = 5
 MOTOR_IN2 = 6
 MOTOR_EN  = 12
 MOTOR_SPEED = 200
+
+high_tick = None
+distance = None
+last_trigger = 0
 
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(sensor_L,GPIO.IN)
@@ -75,33 +82,55 @@ def IRcheck(sensor):
 
 	return IR
 
-def get_distance(TRIG,ECHO):
-    """Measure distance using HC-SR04 (in cm)."""
-    # Ensure trigger is LOW
-    GPIO.output(TRIG, False)
-    time.sleep(0.05)
+def echo_callback(gpio, level, tick):
+    global high_tick, distance
+    
+    if level == 1:      # Rising edge
+        high_tick = tick
+    elif level == 0:    # Falling edge
+        if high_tick is not None:
+            pulse_len = pigpio.tickDiff(high_tick, tick)  # microseconds
+            distance = round((pulse_len / 2) * 0.0343, 2)  # cm
 
-    # Send 10µs pulse
-    GPIO.output(TRIG, True)
-    time.sleep(0.00001)
-    GPIO.output(TRIG, False)
+cb = pi.callback(ECHO, pigpio.EITHER_EDGE, echo_callback)
 
-    # Wait for echo start
-    start = time.time()
-    timeout = start + 0.02  # 20ms safety timeout
-    while GPIO.input(ECHO) == 0 and time.time() < timeout:
-        start = time.time()
+def update_ultrasonic():
+    global last_trigger, distance
+    
+    now = time.time()
+    if now - last_trigger >= 0.06:    # trigger every 60ms
+        pi.gpio_trigger(TRIG, 10, 1)  # 10µs pulse
+        last_trigger = now
 
-    # Wait for echo end
-    stop = time.time()
-    timeout = stop + 0.02
-    while GPIO.input(ECHO) == 1 and time.time() < timeout:
-        stop = time.time()
+    return distance
 
-    # Compute distance
-    elapsed = stop - start
-    distance_cm = (elapsed * 34300) / 2
-    return round(distance_cm, 2)
+#def get_distance(TRIG,ECHO):
+    #"""Measure distance using HC-SR04 (in cm)."""
+    ## Ensure trigger is LOW
+    #GPIO.output(TRIG, False)
+    #time.sleep(0.05)
+
+    ## Send 10µs pulse
+    #GPIO.output(TRIG, True)
+    #time.sleep(0.00001)
+    #GPIO.output(TRIG, False)
+
+    ## Wait for echo start
+    #start = time.time()
+    #timeout = start + 0.02  # 20ms safety timeout
+    #while GPIO.input(ECHO) == 0 and time.time() < timeout:
+    #    start = time.time()
+
+    ## Wait for echo end
+    #stop = time.time()
+    #timeout = stop + 0.02
+    #while GPIO.input(ECHO) == 1 and time.time() < timeout:
+    #    stop = time.time()
+
+    ## Compute distance
+    #elapsed = stop - start
+    #distance_cm = (elapsed * 34300) / 2
+    #return round(distance_cm, 2)
      
 def count():
     global counter, crossprev, cross
@@ -174,6 +203,7 @@ if __name__ == '__main__':
                     leftMotor = 0
                     rightMotor = 0
                     #dist_1 = get_distance(TRIG_1,ECHO_1)
+					#dist_1 = update_ultrasonic()
                     #if dist_1 > 1000:
                         #inTurn = 1
                         #state = "turnRight1"
@@ -252,6 +282,8 @@ if __name__ == '__main__':
                 elif R == 1 or (R==1 and M==1):
                     last_time = time.time()
                     state = "shootRight1"
+				elif index == 9:
+					state = "done"
             case "shoot_Left1":
                 print("shoot_Left1")
                 leftMotor=-2  
@@ -317,7 +349,7 @@ if __name__ == '__main__':
             	GPIO.output(MOTOR_IN2, GPIO.LOW)
             	motorPWM.ChangeDutyCycle(MOTOR_SPEED / 255 * 100)
                 now = time.time()
-                if now-last_time4 > 0.650:
+                if now-last_time4 > shoot_delay:
                     #last_time4 = now
             		GPIO.output(MOTOR_IN1, GPIO.LOW)
             		GPIO.output(MOTOR_IN2, GPIO.LOW)
@@ -406,7 +438,7 @@ if __name__ == '__main__':
             	GPIO.output(MOTOR_IN2, GPIO.LOW)
             	motorPWM.ChangeDutyCycle(MOTOR_SPEED / 255 * 100)
                 now = time.time()
-                if now-last_time4 > 0.650:
+                if now-last_time4 > shoot_delay:
                     #last_time4 = now
             		GPIO.output(MOTOR_IN1, GPIO.LOW)
             		GPIO.output(MOTOR_IN2, GPIO.LOW)
@@ -457,7 +489,7 @@ if __name__ == '__main__':
             	GPIO.output(MOTOR_IN2, GPIO.LOW)
             	motorPWM.ChangeDutyCycle(MOTOR_SPEED / 255 * 100)
                 now = time.time()
-                if now-last_time4 > 0.650:
+                if now-last_time4 > shoot_delay:
                     #last_time4 = now
             		GPIO.output(MOTOR_IN1, GPIO.LOW)
             		GPIO.output(MOTOR_IN2, GPIO.LOW)
