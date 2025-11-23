@@ -5,8 +5,10 @@ import time
 import serial
 import asyncio
 import numpy as np
+import pigpio, time
 from sendStringScript import sendString
 
+pi = pigpio.pi()
 state = "idle"
 x=int(0)
 leftMotor=int(0)
@@ -18,6 +20,7 @@ doneRotation = int(0)
 last_time = time.time()
 last_time2 = time.time()
 last_time3 = time.time()
+last_time4 = time.time()
 
 intersection_counter = 0
 counter = 0
@@ -25,17 +28,36 @@ crossprev = 0
 counter2 = 0
 inTurn = 0
 
+STEP_SIZE = 333
+MIN_PULSE = 620
+MAX_PULSE = 2285
+currentPulse = MIN_PULSE
+step = STEP_SIZE
+
+SERVO_PIN = 13
 sensor_L = 4
 sensor_M = 18
 sensor_R = 22
-TRIG_1 = 27
-ECHO_1 = 22
+TRIG_1 = 23
+ECHO_1 = 24
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(sensor_L,GPIO.IN)
 GPIO.setup(sensor_M,GPIO.IN)
 GPIO.setup(sensor_R,GPIO.IN)
 GPIO.setup(TRIG_1, GPIO.OUT)
 GPIO.setup(ECHO_1, GPIO.IN)
+
+MOTOR_IN1 = 5
+MOTOR_IN2 = 6
+MOTOR_EN  = 12
+MOTOR_SPEED = 200
+
+GPIO.setup(MOTOR_IN1, GPIO.OUT)
+GPIO.setup(MOTOR_IN2, GPIO.OUT)
+GPIO.setup(MOTOR_EN,  GPIO.OUT)
+
+motorPWM = GPIO.PWM(MOTOR_EN, 1000)
+motorPWM.start(0)
 
 def IRcheck(sensor):
 	#time.sleep(0.5)
@@ -88,6 +110,14 @@ def count():
         crossprev=cross
 
         return counter
+
+def ServoStep():
+	if currentPulse >= MAX_PULSE:
+        currentPulse = MAX_PULSE
+        step = -STEP_SIZE
+    elif currentPulse <= MIN_PULSE:
+    	currentPulse = MIN_PULSE
+        step = STEP_SIZE
 
     # --- Main loop ---
 if __name__ == '__main__':
@@ -246,13 +276,7 @@ if __name__ == '__main__':
                     #last_time3 = now
                     leftMotor=0  
                     rightMotor=0
-                    state = "Indeterminant"
-            case "delay_Left":
-                print("delay_Left")
-                now = time.time()
-                if now-last_time2 > 1:
-                    #last_time2 = now
-                    state = "Destination"       
+                    state = "Indeterminant"     
             case "shootLeft1":
                 print("shootLeft 1")
                 print("Heading: ",heading)
@@ -268,9 +292,33 @@ if __name__ == '__main__':
             case "shootLeft":
                 print("shootLeft")
                 now = time.time()
-                if now-last_time > 5:
+                if now-last_time > 2:
                     #last_time = now
-                    state = "shootLeft2"
+					currentPulse += step
+					ServoStep()
+            		print("Pulse:", currentPulse)
+            		pi.set_servo_pulsewidth(SERVO_PIN, currentPulse)
+					last_time3 = time.time()
+                    state = "feedDelayLeft"
+			case "feedDelayLeft":
+                print("feedDelayLeft")
+                now = time.time()
+                if now-last_time3 > 1:
+                    #last_time2 = now
+					last_time4 = time.time()
+                    state = "shootingLeft"
+			case "shootingLeft":
+                print("shootingLeft")
+				GPIO.output(MOTOR_IN1, GPIO.HIGH)
+            	GPIO.output(MOTOR_IN2, GPIO.LOW)
+            	motorPWM.ChangeDutyCycle(MOTOR_SPEED / 255 * 100)
+                now = time.time()
+                if now-last_time4 > 0.650:
+                    #last_time4 = now
+            		GPIO.output(MOTOR_IN1, GPIO.LOW)
+            		GPIO.output(MOTOR_IN2, GPIO.LOW)
+            		motorPWM.ChangeDutyCycle(0)
+                    state = "shootLeft2" 
             case "shootLeft2":
                 print("shootLeft 2")
                 print("Heading: ",heading)
