@@ -37,24 +37,24 @@ MAX_PULSE = 2285
 currentPulse = MIN_PULSE
 step = STEP_SIZE
 
-SERVO_PIN = 13
 sensor_L = 4
 sensor_M = 18
 sensor_R = 22
 TRIG_1 = 23
 ECHO_1 = 24
+
+SERVO_PIN = 13
+MOTOR_IN1 = 5
+MOTOR_IN2 = 6
+MOTOR_EN  = 12
+MOTOR_SPEED = 200
+
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(sensor_L,GPIO.IN)
 GPIO.setup(sensor_M,GPIO.IN)
 GPIO.setup(sensor_R,GPIO.IN)
 GPIO.setup(TRIG_1, GPIO.OUT)
 GPIO.setup(ECHO_1, GPIO.IN)
-
-MOTOR_IN1 = 5
-MOTOR_IN2 = 6
-MOTOR_EN  = 12
-MOTOR_SPEED = 200
-
 GPIO.setup(MOTOR_IN1, GPIO.OUT)
 GPIO.setup(MOTOR_IN2, GPIO.OUT)
 GPIO.setup(MOTOR_EN,  GPIO.OUT)
@@ -386,7 +386,32 @@ if __name__ == '__main__':
                 now = time.time()
                 if now-last_time > 2:
                     #last_time = now
-                    state = "shootRight2"
+					currentPulse += step * step_multipliers[index]
+					index = (index + 1) % len(step_multipliers)
+					ServoStep()
+            		print("Pulse:", currentPulse)
+            		pi.set_servo_pulsewidth(SERVO_PIN, currentPulse)
+					last_time3 = time.time()
+                    state = "feedDelayRight"
+			case "feedDelayRight":
+                print("feedDelayRight")
+                now = time.time()
+                if now-last_time3 > 1:
+                    #last_time2 = now
+					last_time4 = time.time()
+                    state = "shootingRight"
+			case "shootingRight":
+                print("shootingRight")
+				GPIO.output(MOTOR_IN1, GPIO.HIGH)
+            	GPIO.output(MOTOR_IN2, GPIO.LOW)
+            	motorPWM.ChangeDutyCycle(MOTOR_SPEED / 255 * 100)
+                now = time.time()
+                if now-last_time4 > 0.650:
+                    #last_time4 = now
+            		GPIO.output(MOTOR_IN1, GPIO.LOW)
+            		GPIO.output(MOTOR_IN2, GPIO.LOW)
+            		motorPWM.ChangeDutyCycle(0)
+                    state = "shootRight2" 
             case "shootRight2":
                 print("shootRight 2")
                 print("Heading: ",heading)
@@ -411,10 +436,51 @@ if __name__ == '__main__':
                 leftMotor=0  
                 rightMotor=0
                 now = time.time()
-                if now-last_time > 5:
-                    state = "Destination"   
+                if now-last_time > 2:
+					currentPulse += step * step_multipliers[index]
+					index = (index + 1) % len(step_multipliers)
+					ServoStep()
+            		print("Pulse:", currentPulse)
+            		pi.set_servo_pulsewidth(SERVO_PIN, currentPulse)
+					last_time3 = time.time()
+                    state = "feedDelayMid"
+			case "feedDelayMid":
+                print("feedDelayMid")
+                now = time.time()
+                if now-last_time3 > 1:
+                    #last_time2 = now
+					last_time4 = time.time()
+                    state = "shootingMid"
+			case "shootingMid":
+                print("shootingMid")
+				GPIO.output(MOTOR_IN1, GPIO.HIGH)
+            	GPIO.output(MOTOR_IN2, GPIO.LOW)
+            	motorPWM.ChangeDutyCycle(MOTOR_SPEED / 255 * 100)
+                now = time.time()
+                if now-last_time4 > 0.650:
+                    #last_time4 = now
+            		GPIO.output(MOTOR_IN1, GPIO.LOW)
+            		GPIO.output(MOTOR_IN2, GPIO.LOW)
+            		motorPWM.ChangeDutyCycle(0)
+					last_time2 = time.time
+                    state = "delayMid"
+            case "delayMid":
+                print("delayMid")
+                now = time.time()
+                if now-last_time2 > 1:
+                    #last_time2 = now
+                    state = "Destination"
+                    #state = "Indeterminant"
             case "Indeterminant":
                 print("Indeterminant")
                 leftMotor, rightMotor = (0, 0);
                 if pos > 500:
                     state = "Following"
+            case "done":
+                print("done")
+                leftMotor, rightMotor = (0, 0);
+            	GPIO.output(MOTOR_IN1, GPIO.LOW)
+            	GPIO.output(MOTOR_IN2, GPIO.LOW)
+            	motorPWM.ChangeDutyCycle(0)
+				currentPulse = MIN_PULSE
+				pi.set_servo_pulsewidth(SERVO_PIN, currentPulse)
