@@ -28,6 +28,9 @@ crossprev = 0
 counter2 = 0
 inTurn = 0
 
+step_multipliers = [1, 1, 1, 1, 1, 3, 1, 1, 4, 1]  
+index = 0
+
 STEP_SIZE = 333
 MIN_PULSE = 620
 MAX_PULSE = 2285
@@ -294,7 +297,8 @@ if __name__ == '__main__':
                 now = time.time()
                 if now-last_time > 2:
                     #last_time = now
-					currentPulse += step
+					currentPulse += step * step_multipliers[index]
+					index = (index + 1) % len(step_multipliers)
 					ServoStep()
             		print("Pulse:", currentPulse)
             		pi.set_servo_pulsewidth(SERVO_PIN, currentPulse)
