@@ -1,0 +1,534 @@
+#!/usr/bin/env python
+
+import RPi.GPIO as GPIO
+import time
+import serial
+import asyncio
+import numpy as np
+import pigpio, time
+from sendStringScript import sendString
+
+pi = pigpio.pi()
+state = "idle"
+x=int(0)
+#leftMotor=int(0)
+#rightMotor=int(0)
+leftMotor=float(0)
+rightMotor=float(0)
+target = float(0)
+heading = float(0)
+start = int(0)
+doneRotation = int(0)
+last_time = time.time()
+last_time2 = time.time()
+last_time3 = time.time()
+last_time4 = time.time()
+
+intersection_counter = 0
+counter = 0
+crossprev = 0
+counter2 = 0
+inTurn = 0
+
+step_multipliers = [1, 1, 1, 1, 1, 3, 1, 1, 4, 1]  
+index = 0
+
+STEP_SIZE = 333
+MIN_PULSE = 620
+MAX_PULSE = 2285
+currentPulse = MIN_PULSE
+step = STEP_SIZE
+shoot_delay = 3
+
+
+sensor_L = 4
+sensor_M = 18
+sensor_R = 22
+#TRIG_1 = 23
+#ECHO_1 = 24
+TRIG = 23
+ECHO = 24
+
+SERVO_PIN = 13
+MOTOR_IN1 = 5
+MOTOR_IN2 = 6
+MOTOR_EN  = 12
+MOTOR_SPEED = float(60)
+
+high_tick = None
+distance = None
+last_trigger = 0
+
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(sensor_L,GPIO.IN)
+GPIO.setup(sensor_M,GPIO.IN)
+GPIO.setup(sensor_R,GPIO.IN)
+#GPIO.setup(TRIG_1, GPIO.OUT)
+#GPIO.setup(ECHO_1, GPIO.IN)
+GPIO.setup(TRIG, GPIO.OUT)
+GPIO.setup(ECHO, GPIO.IN)
+GPIO.setup(MOTOR_IN1, GPIO.OUT)
+GPIO.setup(MOTOR_IN2, GPIO.OUT)
+GPIO.setup(MOTOR_EN,  GPIO.OUT)
+
+motorPWM = GPIO.PWM(MOTOR_EN, 1000)
+motorPWM.start(0)
+
+def IRcheck(sensor):
+	#time.sleep(0.5)
+	irValue = GPIO.input(sensor)
+	if irValue:
+		IR = 0
+		#print(f"NOT DETECTED Sensor {sensor}")
+				
+	else:
+		IR = 1
+		#print(f"DETECTED Sensor {sensor}")
+
+	return IR
+
+def echo_callback(gpio, level, tick):
+    global high_tick, distance
+    
+    if level == 1:      # Rising edge
+        high_tick = tick
+    elif level == 0:    # Falling edge
+        if high_tick is not None:
+            pulse_len = pigpio.tickDiff(high_tick, tick)  # microseconds
+            distance = round((pulse_len / 2) * 0.0343, 2)  # cm
+
+cb = pi.callback(ECHO, pigpio.EITHER_EDGE, echo_callback)
+
+def update_ultrasonic():
+    global last_trigger, distance
+    
+    now = time.time()
+    if now - last_trigger >= 0.06:    # trigger every 60ms
+        pi.gpio_trigger(TRIG, 10, 1)  # 10µs pulse
+        last_trigger = now
+
+    return distance
+
+#def get_distance(TRIG,ECHO):
+    #"""Measure distance using HC-SR04 (in cm)."""
+    ## Ensure trigger is LOW
+    #GPIO.output(TRIG, False)
+    #time.sleep(0.05)
+
+    ## Send 10µs pulse
+    #GPIO.output(TRIG, True)
+    #time.sleep(0.00001)
+    #GPIO.output(TRIG, False)
+
+    ## Wait for echo start
+    #start = time.time()
+    #timeout = start + 0.02  # 20ms safety timeout
+    #while GPIO.input(ECHO) == 0 and time.time() < timeout:
+    #    start = time.time()
+
+    ## Wait for echo end
+    #stop = time.time()
+    #timeout = stop + 0.02
+    #while GPIO.input(ECHO) == 1 and time.time() < timeout:
+    #    stop = time.time()
+
+    ## Compute distance
+    #elapsed = stop - start
+    #distance_cm = (elapsed * 34300) / 2
+    #return round(distance_cm, 2)
+     
+def count():
+    global counter, crossprev, cross
+    if cross==1 and crossprev!=1:
+        counter +=1
+        crossprev=cross
+        #print(counter) 
+    else :
+        crossprev=cross
+
+        return counter
+    
+def ServoStep():
+    global currentPulse, MAX_PULSE, MIN_PULSE, step, STEP_SIZE
+    if currentPulse >= MAX_PULSE:
+        currentPulse = MAX_PULSE
+        step = -STEP_SIZE
+    elif currentPulse <= MIN_PULSE:
+        currentPulse = MIN_PULSE
+        step = STEP_SIZE
+           
+    # --- Main loop ---
+if __name__ == '__main__':
+    ser=serial.Serial('/dev/ttyACM0',9600)
+    ser.reset_input_buffer() #clears anything the arduino has been sending while the Rpi isnt prepared to recieve.
+
+    while True:
+        sendString('/dev/ttyACM0',9600,'<'+str(leftMotor)+','+str(rightMotor)+','+str(target)+','+str(start)+'>',0.0001)
+        
+        if ser.in_waiting > 0:  #we wait until the arduino has sent something to us before we try to read anything from the serial port.
+                line = ser.readline().decode('utf-8')
+                line=line.split(',')
+                #print(line)
+                #this splits the incoming string up by commas
+                try:                  
+                    x=int(line[0])
+                    pos=int(line[1])
+                    cross=int(line[2])
+                    heading=float(line[3])
+                    doneRotation=int(line[4])
+                    #print([x,pos,cross])
+                    #print(heading, doneRotation)
+                    intersection_counter = count()
+                    #if pos < 500 and state != "initialForward" and state != "idle":
+                        #state="Indeterminant" 
+                except:
+                    print("packet dropped") #this is designed to catch when python shoves bits on top of each other.                 
+          
+        match state:
+            case "idle":
+                print("idle")
+                #if x==1: 
+                    #state = "align"
+                #state = "align"
+                #state = "shootingLeft"
+                dist_1 = update_ultrasonic()
+                print(dist_1)
+                #state = "done"
+            case "align":
+                print("Align")
+                print("Heading: ",heading)
+                target = 273
+                print("Target: ",target)
+                start = 1
+                if doneRotation == 1:
+                    start = 0    
+                    state = "initialForward"
+                    #state = "Destination"
+            case "initialForward":
+                print("initialForward")
+                leftMotor = 2
+                rightMotor = 2
+                if cross == 1:
+                    leftMotor = 0
+                    rightMotor = 0
+                    #dist_1 = get_distance(TRIG_1,ECHO_1)
+					#dist_1 = update_ultrasonic()
+                    #if dist_1 > 91.44:
+                        #inTurn = 0
+                        #state = "turnRight1"
+                    #else: 
+                        #inTurn = 1
+                        #state = "turnLeft1"
+                    inTurn = 1
+                    state = "turnLeft1"
+            case "turnRight1":
+                print("Initial Turn Right")
+                print("Heading: ",heading)
+                target = heading - 90
+                print("Target: ",target)
+                start = 1
+                if doneRotation == 1:
+                    start = 0
+                    counter = 0    
+                    state = "Following"
+            case "turnLeft1":
+                print("Initial Turn Left")
+                print("Heading: ",heading)
+                target = heading + 90
+                print("Target: ", target)
+                start = 1
+                if doneRotation == 1:
+                    start = 0
+                    counter = 0    
+                    state = "Following"
+            case "Following":
+                print("Line Following")
+                print("Heading: ",heading)
+                error = (pos-3500)/3500
+                rightMotor = max(0,min(20,2 - 3*error))
+                leftMotor = max(0,min(20,2 + 3*error))
+                print("PID: ",leftMotor,rightMotor)
+                if counter == 1 and counter2 == 0 and inTurn == 0:
+                    state = "turnLeft"
+                elif counter == 1 and counter2 == 0 and inTurn == 1:
+                    state = "turnRight"
+                elif counter == 2:
+                    state = "Destination"
+            case "turnLeft":
+                print("Turn Left")
+                print("Heading: ",heading)
+                target = heading + 90
+                print("Target: ",target)
+                start = 1
+                if doneRotation == 1:
+                    start = 0
+                    counter2 = 1   
+                    state = "Following"
+            case "turnRight":
+                print("Turn Right")
+                print("Heading: ",heading)
+                target = heading - 90
+                print("Target: ",target)
+                start = 1
+                if doneRotation == 1:
+                    start = 0
+                    counter2 = 1   
+                    state = "Following"
+            case "Destination":
+                print("Destination")
+                leftMotor, rightMotor = (0, 0);
+                L =  IRcheck(sensor_L)
+                M =  IRcheck(sensor_M)
+                R =  IRcheck(sensor_R)
+                print(L,M,R)
+                #print(heading, doneRotation)
+                if L ==1 or (L==1 and M==1):
+                    last_time = time.time()
+                    state = "shootLeft1"
+                elif M ==1 and L == 0 and R == 0:
+                    last_time = time.time()
+                    state = "shootMid"
+                elif R == 1 or (R==1 and M==1):
+                    last_time = time.time()
+                    state = "shootRight1"
+                elif index == 10:
+                    state = "done"
+            case "shoot_Left1":
+                print("shoot_Left1")
+                leftMotor=-2  
+                rightMotor=2
+                now = time.time()
+                if now-last_time > 1.5:
+                    #last_time = now
+                    leftMotor=0  
+                    rightMotor=0
+                    last_time2 = time.time()
+                    state = "shoot_Left"
+            case "shoot_Left":
+                print("shoot_Left")
+                now = time.time()
+                if now-last_time2 > 2:
+                    #last_time2 = now
+                    last_time3 = time.time()
+                    state = "shoot_Left2"
+            case "shoot_Left2":
+                print("shoot_Left2")
+                leftMotor=2  
+                rightMotor=-2
+                now = time.time()
+                if now-last_time3 > 1.5:
+                    #last_time3 = now
+                    leftMotor=0  
+                    rightMotor=0
+                    state = "Indeterminant"     
+            case "shootLeft1":
+                print("shootLeft 1")
+                print("Heading: ",heading)
+                target = heading + 45
+                print("Target: ",target)
+                start = 1
+                if doneRotation == 1:
+                    start = 0
+                    leftMotor=0  
+                    rightMotor=0
+                    last_time = time.time()
+                    state = "shootLeft"
+            case "shootLeft":
+                print("shootLeft")
+                now = time.time()
+                if now-last_time > 2:
+                    #last_time = now
+                    currentPulse += step * step_multipliers[index]
+                    print("Index:", index)
+                    index = (index + 1) #% len(step_multipliers)
+                    ServoStep()
+                    print("Pulse:", currentPulse)
+                    pi.set_servo_pulsewidth(SERVO_PIN, currentPulse)
+                    last_time3 = time.time()
+                    state = "feedDelayLeft"
+            case "feedDelayLeft":
+                print("feedDelayLeft")
+                now = time.time()
+                if now-last_time3 > 1:
+                    #last_time3 = now
+                    last_time4 = time.time()
+                    state = "shootingLeft"
+            case "shootingLeft":
+                print("shootingLeft")
+                GPIO.output(MOTOR_IN1, GPIO.HIGH)
+                GPIO.output(MOTOR_IN2, GPIO.LOW)
+                motorPWM.ChangeDutyCycle(MOTOR_SPEED / 255 * 100)
+                now = time.time()
+                if now-last_time4 > shoot_delay:
+                    #last_time4 = now
+                    GPIO.output(MOTOR_IN1, GPIO.LOW)
+                    GPIO.output(MOTOR_IN2, GPIO.LOW)
+                    motorPWM.ChangeDutyCycle(0)
+                    state = "shootLeft2"
+                    #last_time3 = time.time()
+                    #state = "feedDelayLeft" 
+            case "shootLeft2":
+                print("shootLeft 2")
+                print("Heading: ",heading)
+                target = heading - 45
+                print("Target: ",target)
+                start = 1
+                if doneRotation == 1:
+                    start = 0
+                    leftMotor=0  
+                    rightMotor=0
+                    last_time2=time.time()
+                    state = "delayLeft"
+            case "delayLeft":
+                print("delayLeft")
+                now = time.time()
+                if now-last_time2 > 1:
+                    #last_time2 = now
+                    state = "Destination"
+            case "shoot_Right1":
+                print("shoot_Right1")
+                leftMotor=2  
+                rightMotor=-2
+                now = time.time()
+                if now-last_time > 1.5:
+                    #last_time = now
+                    leftMotor=0  
+                    rightMotor=0
+                    last_time2 = time.time()
+                    state = "shoot_Right"
+            case "shoot_Right":
+                print("shoot_Right")
+                now = time.time()
+                if now-last_time2 > 2:
+                    #last_time2 = now
+                    last_time3 = time.time()
+                    state = "shoot_Right2"
+            case "shoot_Right2":
+                print("shoot_Right2")
+                leftMotor=-2  
+                rightMotor=2
+                now = time.time()
+                if now-last_time3 > 1.5:
+                    #last_time3 = now
+                    leftMotor=0  
+                    rightMotor=0
+                    state = "Destination"       
+            case "shootRight1":
+                print("shootRight 1")
+                print("Heading: ",heading)
+                target = heading - 45
+                print("Target: ",target)
+                start = 1
+                if doneRotation == 1:
+                    start = 0
+                    leftMotor=0  
+                    rightMotor=0
+                    last_time = time.time()
+                    state = "shootRight"
+            case "shootRight":
+                print("shootRight")
+                now = time.time()
+                if now-last_time > 2:
+                    #last_time = now
+                    currentPulse += step * step_multipliers[index]
+                    print("Index:", index)
+                    index = (index + 1) #% len(step_multipliers)
+                    ServoStep()
+                    print("Pulse:", currentPulse)
+                    pi.set_servo_pulsewidth(SERVO_PIN, currentPulse)
+                    last_time3 = time.time()
+                    state = "feedDelayRight"
+            case "feedDelayRight":
+                print("feedDelayRight")
+                now = time.time()
+                if now-last_time3 > 1:
+                    #last_time3 = now
+                    last_time4 = time.time()
+                    #last_time = time.time()
+                    state = "shootingRight"
+                    #state = "shootRight"
+            case "shootingRight":
+                print("shootingRight")
+                GPIO.output(MOTOR_IN1,GPIO.HIGH)
+                GPIO.output(MOTOR_IN2, GPIO.LOW)
+                motorPWM.ChangeDutyCycle(MOTOR_SPEED / 255 * 100)
+                now = time.time()
+                if now-last_time4 > shoot_delay:
+                    #last_time4 = now
+                    GPIO.output(MOTOR_IN1, GPIO.LOW)
+                    GPIO.output(MOTOR_IN2, GPIO.LOW)
+                    motorPWM.ChangeDutyCycle(0)
+                    state = "shootRight2" 
+            case "shootRight2":
+                print("shootRight 2")
+                print("Heading: ",heading)
+                target = heading + 45
+                print("Target: ",target)
+                start = 1
+                if doneRotation == 1:
+                    start = 0
+                    leftMotor=0  
+                    rightMotor=0
+                    last_time2 = time.time()
+                    state = "delayRight"
+            case "delayRight":
+                print("delayRight")
+                now = time.time()
+                if now-last_time2 > 1:
+                    #last_time2 = now
+                    state = "Destination"
+                    #state = "Indeterminant"
+            case "shootMid":
+                print("shootMid")
+                leftMotor=0  
+                rightMotor=0
+                now = time.time()
+                if now-last_time > 2:
+                    currentPulse += step * step_multipliers[index]
+                    print("Index:", index)
+                    index = (index + 1) #% len(step_multipliers)
+                    ServoStep()
+                    print("Pulse:", currentPulse)
+                    pi.set_servo_pulsewidth(SERVO_PIN, currentPulse)
+                    last_time3 = time.time()
+                    state = "feedDelayMid"
+            case "feedDelayMid":
+                print("feedDelayMid")
+                now = time.time()
+                if now-last_time3 > 1:
+                    #last_time2 = now
+                    last_time4 = time.time()
+                    state = "shootingMid"
+            case "shootingMid":
+                print("shootingMid")
+                GPIO.output(MOTOR_IN1, GPIO.HIGH)
+                GPIO.output(MOTOR_IN2, GPIO.LOW)
+                motorPWM.ChangeDutyCycle(MOTOR_SPEED / 255 * 100)
+                now = time.time()
+                if now-last_time4 > shoot_delay:
+                    #last_time4 = now
+                    GPIO.output(MOTOR_IN1, GPIO.LOW)
+                    GPIO.output(MOTOR_IN2, GPIO.LOW)
+                    motorPWM.ChangeDutyCycle(0)
+                    last_time2 = time.time
+                    state = "delayMid"
+            case "delayMid":
+                print("delayMid")
+                now = time.time()
+                if now-last_time2 > 1:
+                    #last_time2 = now
+                    state = "Destination"
+                    #state = "Indeterminant"
+            case "Indeterminant":
+                print("Indeterminant")
+                leftMotor, rightMotor = (0, 0);
+                if pos > 500:
+                    state = "Following"
+            case "done":
+                print("done")
+                leftMotor, rightMotor = (0, 0);
+                GPIO.output(MOTOR_IN1, GPIO.LOW)
+                GPIO.output(MOTOR_IN2, GPIO.LOW)
+                motorPWM.ChangeDutyCycle(0)
+                currentPulse = MIN_PULSE
+                pi.set_servo_pulsewidth(SERVO_PIN, currentPulse)
