@@ -55,7 +55,7 @@ SERVO_PIN = 13
 MOTOR_IN1 = 5
 MOTOR_IN2 = 6
 MOTOR_EN  = 12
-MOTOR_SPEED = float(100)
+MOTOR_SPEED = float(150)
 
 high_tick = None
 distance = None
@@ -107,7 +107,7 @@ def update_ultrasonic():
     
     now = time.time()
     if now - last_trigger >= 0.06:    # trigger every 60ms
-        pi.gpio_trigger(TRIG, 10, 1)  # 10µs pulse
+        pi.gpio_trigger(TRIG, 10, 1)  # 10Âµs pulse
         last_trigger = now
 
     return distance
@@ -118,7 +118,7 @@ def update_ultrasonic():
     #GPIO.output(TRIG, False)
     #time.sleep(0.05)
 
-    ## Send 10µs pulse
+    ## Send 10Âµs pulse
     #GPIO.output(TRIG, True)
     #time.sleep(0.00001)
     #GPIO.output(TRIG, False)
@@ -193,7 +193,7 @@ if __name__ == '__main__':
                     #if x==1: 
                         #state = "align"
                     #state = "align"
-                    #state = "shootMid"
+                    state = "shootMid"
                     #dist_1 = update_ultrasonic()
                     #print(dist_1)
                     #L =  IRcheck(sensor_L)
@@ -201,7 +201,7 @@ if __name__ == '__main__':
                     #R =  IRcheck(sensor_R)
                     #print(L,M,R)
                     #state = "initialForward"
-                    state = "done"
+                    #state = "done"
                     #print(heading)
                     #state = "shootingMidBump"
                 case "align":
@@ -608,7 +608,7 @@ if __name__ == '__main__':
                 case "feedDelayMid":
                     print("feedDelayMid")
                     now = time.time()
-                    if now-last_time3 > 1:
+                    if now-last_time3 > 2:
                         #last_time2 = now
                         last_time4 = time.time()
                         #state = "shootingMid"
@@ -651,6 +651,7 @@ if __name__ == '__main__':
                     now = time.time()
                     if now-last_time5 > 1:
                         state = "shootingMidBumpBack"
+                        #state = "done"
                 case "shootingMidBumpBack":
                     print("shootingMidBumpBack")
                     GPIO.output(MOTOR_IN1, GPIO.LOW)
@@ -663,21 +664,24 @@ if __name__ == '__main__':
                     print("shootingMidBumpBack2")
                     GPIO.output(MOTOR_IN1, GPIO.LOW)
                     GPIO.output(MOTOR_IN2, GPIO.HIGH)
-                    motorPWM.ChangeDutyCycle(MOTOR_SPEED / 255 * 100)
+                    motorPWM.ChangeDutyCycle((MOTOR_SPEED-110) / 255 * 100)
                     if GPIO.input(switch) == GPIO.LOW:
                         print("Limit Hit (back)")
                         GPIO.output(MOTOR_IN1, GPIO.LOW)
                         GPIO.output(MOTOR_IN2, GPIO.LOW)
                         motorPWM.ChangeDutyCycle(0)
-                        #state = "delayMid"
-                        state = "done"
+                        last_time2 = time.time()
+                        state = "delayMid"
+                        #state = "done"
                         #state = "shootingMidBump"
                 case "delayMid":
                     print("delayMid")
                     now = time.time()
                     if now - last_time2 > 1:
                         #last_time2 = now
-                        state = "Destination"
+                        #state = "Destination"
+                        #state = "done"
+                        state = "shootMid"
                         #state = "Indeterminant"
                 case "Indeterminant":
                     print("Indeterminant")
