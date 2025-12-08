@@ -1,0 +1,22 @@
+def align_step(heading, target, offset=3, turn_speed=2):
+    # Normalize target 0-360
+    target = target % 360
+    if target < 0:
+        target += 360
+
+    # Check if already aligned
+    if abs(heading - target) <= offset:
+        return 0, 0
+
+    # Match Arduino turning logic
+    if (heading > target and (heading - target) < 180) or \
+       (heading < target and (target - heading) > 180):
+        # Turn one direction
+        leftMotor  = turn_speed
+        rightMotor = -turn_speed
+    else:
+        # Turn the other direction
+        leftMotor  = -turn_speed
+        rightMotor = turn_speed
+
+    return leftMotor, rightMotor
